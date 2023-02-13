@@ -1,0 +1,5 @@
+tensorflow
+tensorflow-gpu
+numpy
+gym
+pandas
