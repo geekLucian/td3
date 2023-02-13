@@ -10,11 +10,12 @@ from random import sample
 
 
 def rank(buyer_name, buyer_num, seller_name, seller_num):
-    # print("输入购电方名称：", buyer_name)
-    # print("输入购电方数据：", buyer_num)
-    # print("输入售电方名称：", seller_name)
-    # print("输入售电方数据：", seller_num)
+    """
+    排序：买方电价降序，卖方电价升序
+    调用匹配出清函数，返回匹配结果和出清价格
+    """
 
+    # ====================== 特殊处理 ======================
     # 存在特殊情况下出现神经网络输出的动作值全为Nan，导致程序出错，中断运行
     for i in range(len(buyer_num)):
         if np.isnan(buyer_num[i][0]):
@@ -35,6 +36,7 @@ def rank(buyer_name, buyer_num, seller_name, seller_num):
         else:
             pass
 
+    # ====================== 买方降序 ======================
     buyer_amount = []  # 该列表存储了购电方申报电价
     for i in buyer_num:
         buyer_amount.append(i[0])
@@ -43,8 +45,6 @@ def rank(buyer_name, buyer_num, seller_name, seller_num):
     buyer_name_sort = []
     buyer_num_temp = buyer_num.copy()  # 复制购电方电价电量队列
     buyer_name_temp = buyer_name.copy()  # 复制购电方名称队列
-
-    # print("buyer_amount_sort:", buyer_amount_sort)
 
     for j in range(len(buyer_num)):
         for i in range(len(buyer_num_temp)):
@@ -57,6 +57,7 @@ def rank(buyer_name, buyer_num, seller_name, seller_num):
                 break
     # 完成这部分循环，购电方名称和申报数据按电价从高到低排序
 
+    # ====================== 卖方升序 ======================
     seller_amount = []
     for i in seller_num:
         seller_amount.append(i[0])
@@ -76,19 +77,18 @@ def rank(buyer_name, buyer_num, seller_name, seller_num):
                 seller_name_temp.pop(i)
                 break
     # 完成这部分循环，售电方名称和申报数据按电价从高到低排序
-    # print("源数据", buyer_number_sort)
-    # print("元数据", seller_number_sort)
-    # print("源数据", buyer_name_sort)
-    # print("元数据", seller_name_sort)
 
+    # ====================== 匹配出清 ======================
     match_result, clear_price = match(buyer_number_sort, buyer_name_sort, seller_number_sort, seller_name_sort)
     # 进行出清操作
-    # print(seller_num_temp, seller_name_temp)
 
     return match_result, clear_price
 
 
 def match(buyer_number_sort, buyer_name_sort, seller_number_sort, seller_name_sort):
+    """
+    匹配出清
+    """
     buyer_number_sort_copy = buyer_number_sort.copy()  # 根据电价从高到低排的购电方申报数据列表
     seller_number_sort_copy = seller_number_sort.copy()  # 根据电价从高到低排的售电方申报数据列表
     buyer_name_sort_copy = buyer_name_sort.copy()  # 根据电价从高到低排的购电方名称列表
