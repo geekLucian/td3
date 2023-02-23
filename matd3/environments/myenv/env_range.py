@@ -36,52 +36,30 @@ class RangeEnv(gym.Env):
         self.buyer_name = ["buyer_%d" % i for i in range(self.num_of_buyer)]
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
-        # 求动作空间的最大值，最小值
-        # act = [seller0price, seller0volume, seller1price, ...,
-        #        buyer0price, buyer0volume, buyer1price, ...]
-        act_high = np.zeros(2 * self.num_of_seller + 2 * self.num_of_buyer).flatten()
-        act_low = np.zeros(2 * self.num_of_seller + 2 * self.num_of_buyer).flatten()
-        i = 0
-        for j in range(self.num_of_seller):
-            act_high[i] = self.max_seller_price[j]
-            act_high[i + 1] = self.max_seller_volume[j]
-            act_low[i] = self.min_seller_price[j]
-            act_low[i + 1] = self.min_seller_volume[j]
-            i += 2
-
-        for j in range(self.num_of_buyer):
-            act_high[i] = self.max_buyer_price[j]
-            act_high[i + 1] = self.max_buyer_volume[j]
-            act_low[i] = self.min_buyer_price[j]
-            act_low[i + 1] = self.min_buyer_volume[j]
-            i += 2
-
-        self.observation_space = []
-        self.action_space = []
-
+        self.action_space = self.observation_space = []
         # TODO: Update usage
         # 设定动作空间
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
-        #                 Box(buyer0_price, buyer0_volume), ...]
-        # Price_Range_Factor(PRF) = (Price_Upper - Price_Lower) / (Max_Price - Min_Price), 0 <= PRF <= 1
-        for i in range(self.num_of_seller):
-            self.action_space.append(spaces.Box(low=np.array([act_low[2*i], 0, act_low[2*i+1]]),
-                                                high=np.array([act_high[2*i], 1, act_high[2*i+1]]),
-                                                shape=(3,), dtype=np.float32))
-        for i in range(self.num_of_seller, self.n):
-            self.action_space.append(spaces.Box(low=act_low[2*i: 2*i+2],
-                                                high=act_high[2*i: 2*i+2],
-                                                shape=(2,), dtype=np.float32))
-
+        #                 Box(buyer0_price, placeholder, buyer0_volume), ...]
+        # Notes:
+        #   1. Not using seller_price_upper (should be >= seller_price_lower) since its lower bound is dynamic
+        #   2. Price_Range_Factor(PRF) = (Price_Upper - Price_Lower) / (Max_Price - Min_Price), 0 <= PRF <= 1
+        #   3. Require a placeholder in buyer's action to align its size with seller's
+        seller_action_space = [spaces.Box(low=np.array([self.min_seller_price[i], 0, self.min_seller_volume[i]]),
+                                          high=np.array([self.max_seller_price[i], 1, self.max_seller_volume[i]]),
+                                          shape=(3,), dtype=np.float32) for i in range(self.num_of_seller)]
+        buyer_action_space = [spaces.Box(low=np.array([self.min_buyer_price[i], 0, self.min_buyer_volume[i]]),
+                                          high=np.array([self.max_buyer_price[i], 0, self.max_buyer_volume[i]]),
+                                          shape=(3,), dtype=np.float32) for i in range(self.num_of_buyer)]
+        self.action_space = seller_action_space + buyer_action_space
+        max_volume = max(np.max(self.max_seller_volume), np.max(self.max_buyer_volume))
+        max_price = max(np.max(self.max_seller_price), np.max(self.max_buyer_price))
         # 设定观测空间
         # observation_space = [Box(seller0_reported_volume, seller0_avg_price), ...,
         #                      Box(buyer0_reported_volume, buyer0_avg_price), ...]
-        for j in range(self.n):
-            self.observation_space.append(spaces.Box(
-                low=np.array([0, 0]),
-                high=np.array([np.max(self.max_seller_volume),
-                               max(np.max(self.max_seller_price), np.max(self.max_buyer_price))]),
-                shape=(2,), dtype=np.float32))
+        self.observation_space = [spaces.Box(low=np.array([0, 0]),
+                                             high=np.array([max_volume, max_price]),
+                                             shape=(2,), dtype=np.float32) for _ in range(self.n)]
 
     # 输入售电方的最大申报量、最小申报量、成本模型信息，strategy文件存储：最大申报价格、最小申报价格、低价区间采购量范围、中价区间采购量范围、高价区间采购量范围
     def set_data_for_seller(self, path="data2/seller_data.txt", path_strategy="data2/seller_strategy_data.txt"):
@@ -101,7 +79,6 @@ class RangeEnv(gym.Env):
         seller_strategy = np.loadtxt(path_strategy)
         self.max_seller_price = seller_strategy[:, 0]
         self.min_seller_price = seller_strategy[:, 1]
-        return True
 
     # 输入购电方的成本模型信息，strategy文件存储：最大申报价格、最小申报价格、低价区间采购量范围、中价区间采购量范围、高价区间采购量范围
     def set_data_for_buyer(self, path="data2/buyer_data.txt", path_strategy="data2/buyer_strategy_data.txt"):
@@ -112,7 +89,6 @@ class RangeEnv(gym.Env):
         buyer_strategy = np.loadtxt(path_strategy)
         self.max_buyer_price = buyer_strategy[:, 0]
         self.min_buyer_price = buyer_strategy[:, 1]
-        return True
 
     def reset(self):
         """
@@ -140,38 +116,17 @@ class RangeEnv(gym.Env):
 
         # Data Packing
         # _action data layout:
-        #   [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, buyer0_volume, ...]
+        #   [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, 0, buyer0_volume, ...]
         _seller_data = [seller_price_lower, seller_price_upper, seller_volume]
-        _buyer_data = [buyer_price, buyer_volume]
+        _buyer_data = [buyer_price, [0] * self.num_of_buyer, buyer_volume]
         _seller_action = [val for tup in zip(*_seller_data) for val in tup]
         _buyer_action = [val for tup in zip(*_buyer_data) for val in tup]
         _action = _seller_action + _buyer_action
 
         # ========================= 出清 ===========================
         # match_result := [[buyer_name, seller_name, match_volume, match_price], ...]
-        match_result = self.get_match_result(_action)  # 匹配出清
-        seller_reported_volume = np.zeros(self.num_of_seller)  # 售电方各自的成交量
-        buyer_reported_volume = np.zeros(self.num_of_buyer)  # 购电方各自的成交量
-        seller_avg_price = np.zeros(self.num_of_seller)  # 售电方卖出的平均价格
-        buyer_avg_price = np.zeros(self.num_of_seller)  # 购电方买入的平均价格
-        for i in range(len(match_result)):
-            buyer_name = int(match_result[i][0])
-            seller_name = int(match_result[i][1])
-            match_volume = int(match_result[i][2])
-            match_price = int(match_result[i][3])
-            match_value = match_volume * match_price
-            seller_avg_price[seller_name] = (
-                    (seller_avg_price[seller_name] * seller_reported_volume[seller_name] + match_value)
-                    /
-                    (seller_reported_volume[seller_name] + match_volume)
-            )
-            buyer_avg_price[buyer_name] = (
-                    (buyer_avg_price[buyer_name] * buyer_reported_volume[buyer_name] + match_value)
-                    /
-                    (buyer_reported_volume[buyer_name] + match_volume)
-            )
-            seller_reported_volume[seller_name] += match_volume
-            buyer_reported_volume[buyer_name] += match_volume
+        match_result = self.get_match_result(_action)
+        seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
         # ======================= 更新状态 ==========================
         seller_state = [np.array([seller_reported_volume[i], seller_avg_price[i]]) for i in range(self.num_of_seller)]
@@ -186,7 +141,7 @@ class RangeEnv(gym.Env):
         # TODO: 1. reward 仅为卖方回报； 2. 更新所有调用此函数的clear_price（由标量变为了1d向量）
         return state, reward, clear_price
 
-    # TODO: Implement step()
+    # TODO: test
     def step(self, action: List[np.ndarray]):
         """
         执行一步动作。
@@ -208,40 +163,30 @@ class RangeEnv(gym.Env):
         比如，将 x \in [-1, 1] 转到 [-2, 4]， 则是 x * (4-(-2))/2 + (4+(-2))/2
         """
 
-        # 将list类型的action转换为ndarray类型的action_t
-        action_t = self.action_strategy(np.array(action).flatten())
-        # action组成[seller_price ,seller_volume , .........,buyer_price,buyer_volume,buyer_price,buyer_volume]
-        match_result, clear_price = self.get_match_result(action_t)  # 进行出清操作
-        total_match_volume = calculate_total_amount(match_result)  # 计算总出清量
+        # Map NN output vector's component from [-1, 1] into real values
+        _action = self.action_strategy(np.array(action).flatten())
+        match_result = self.get_match_result(_action)
+        total_match_volume = calculate_total_amount(match_result)
+        seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
-        seller_reported_volume = np.zeros(self.num_of_seller)  # seller_reported_volume存储了售电方各自的成交量
-        for i in range(len(match_result)):
-            seller_reported_volume[int(match_result[i][1][7:])] += match_result[i][2]
+        seller_state = [np.array([seller_reported_volume[i], seller_avg_price[i]]) for i in range(self.num_of_seller)]
+        buyer_state = [np.array([buyer_reported_volume[i], buyer_avg_price[i]]) for i in range(self.num_of_buyer)]
+        state = seller_state + buyer_state
 
-        buyer_reported_volume = np.zeros(self.num_of_buyer)  # buyer_reported_volume存储了购电方各自的成交量
-        for i in range(len(match_result)):
-            buyer_reported_volume[int(match_result[i][0][6:])] += match_result[i][2]
+        total_seller_cost = sum(self.calculate_cost(seller_reported_volume))  # 根据卖方成本函数计算成本
+        total_seller_value = np.dot(seller_reported_volume, seller_avg_price)
+        reward = total_seller_value - total_seller_cost  # 卖方回报
 
-        state = []
-        for i in range(self.num_of_seller):
-            state.append(np.array([seller_reported_volume[i], clear_price]))
-        for i in range(self.num_of_buyer):
-            state.append(np.array([buyer_reported_volume[i], clear_price]))
+        clear_price = np.append(seller_avg_price, buyer_avg_price)
 
         cost_result = self.calculate_cost(seller_reported_volume)  # 根据每个卖家出清量计算相应的各自的成本
-        total_match_value = total_match_volume * clear_price  # 发电商总收益
 
-        reward = total_match_value - sum(cost_result)  # 总利润=总收益-总成本
+        seller_profit = np.array([seller_reported_volume[i] * clear_price[i] - cost_result[i]
+                                  for i in range(self.num_of_seller)])
 
-        seller_profit = np.zeros(self.num_of_seller)  # 存储售电方各自的利润
-        for i in range(self.num_of_seller):  # 计算售电方各自利润
-            seller_profit[i] = seller_reported_volume[i] * clear_price - cost_result[i]
-        # buyer_pay = np.zeros(self.num_of_buyer)  # 存储购电方各自的购电花费
-        # for i in range(self.num_of_buyer):  # 计算购电方各自购电花销
-        #     buyer_pay[i] = buyer_reported_volume[i] * clear_price
-
-        return state, reward, clear_price, total_match_volume, seller_reported_volume, buyer_reported_volume, match_result, seller_profit, False, None
-        # 返回本轮状态，发电商总利润，发电量总成交量
+        # TODO: 1. update usage (clear_price->vector) 2. done = itr >= EPISODE_LENGTH
+        return state, reward, clear_price, total_match_volume, seller_reported_volume, buyer_reported_volume, \
+               match_result, seller_profit, False, None
 
     def render(self, mode='human'):
         """渲染环境，如果无法渲染，则不实现"""
@@ -251,7 +196,8 @@ class RangeEnv(gym.Env):
     def get_match_result(self, _action):
         """
         获取匹配出清结果
-        :param _action: [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, buyer0_volume, ...]
+        :param _action: [seller0_price_lower, seller0_price_upper, seller0_volume, ...,
+                         buyer0_price, placeholder, buyer0_volume, ...]
         :return: match_result = [[buyer_name, seller_name, match_volume, match_price], ...]
         """
         # ======================= Data Unpack ==========================
@@ -262,16 +208,16 @@ class RangeEnv(gym.Env):
             seller_price_upper.append(_action[3 * idx + 1])
             seller_volume.append(_action[3 * idx + 2])
         for idx in range(self.num_of_buyer):
-            buyer_price.append(_action(self.num_of_seller + 2 * idx))
-            buyer_volume.append(_action(self.num_of_seller + 2 * idx + 1))
+            buyer_price.append(_action[self.num_of_seller + 3 * idx])
+            buyer_volume.append(_action[self.num_of_seller + 3 * idx + 2])
 
         # ======================= Price Rank ==========================
         seller_data = zip(seller_price_lower, seller_price_upper, seller_volume, seller_name)
         buyer_data = zip(buyer_price, buyer_volume, buyer_name)
         seller_data = sorted(seller_data)  # sort sellers' metadata according to their prices' lower bound increasingly
         buyer_data = sorted(buyer_data, reverse=True)  # sort buyers' metadata according to their prices decreasingly
-        seller_price_lower, seller_price_upper, seller_volume, seller_name = zip(*seller_data)
-        buyer_price, buyer_volume, buyer_name = zip(*buyer_data)
+        seller_price_lower, seller_price_upper, seller_volume, seller_name = map(list, zip(*seller_data))
+        buyer_price, buyer_volume, buyer_name = map(list, zip(*buyer_data))
 
         # ====================== Generate Ranges =======================
         seller_price = sorted(seller_price_lower + seller_price_upper)
@@ -312,6 +258,31 @@ class RangeEnv(gym.Env):
                 matching_buyer_price = buyer_price[matching_buyer_idx]
         return matching_result
 
+    def statistics(self, match_result):
+        seller_reported_volume = np.zeros(self.num_of_seller)   # 售电方各自的成交量
+        buyer_reported_volume = np.zeros(self.num_of_buyer)     # 购电方各自的成交量
+        seller_avg_price = np.zeros(self.num_of_seller)         # 售电方卖出的平均价格
+        buyer_avg_price = np.zeros(self.num_of_seller)          # 购电方买入的平均价格
+        for i in range(len(match_result)):
+            buyer_name = int(match_result[i][0])
+            seller_name = int(match_result[i][1])
+            match_volume = int(match_result[i][2])
+            match_price = int(match_result[i][3])
+            match_value = match_volume * match_price
+            seller_avg_price[seller_name] = (
+                    (seller_avg_price[seller_name] * seller_reported_volume[seller_name] + match_value)
+                    /
+                    (seller_reported_volume[seller_name] + match_volume)
+            )
+            buyer_avg_price[buyer_name] = (
+                    (buyer_avg_price[buyer_name] * buyer_reported_volume[buyer_name] + match_value)
+                    /
+                    (buyer_reported_volume[buyer_name] + match_volume)
+            )
+            seller_reported_volume[seller_name] += match_volume
+            buyer_reported_volume[buyer_name] += match_volume
+        return seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price
+
     # 售电侧成本
     def calculate_cost(self, reported_volume):
         """
@@ -326,22 +297,41 @@ class RangeEnv(gym.Env):
         return result
 
     # 根据价格生成策略
-    def action_strategy(self, action):  # 输入未被归一化的action动作
-        act = []
-        act.extend(action)
-        # 还原动作值到为归一化数值
-        for i in range(self.num_of_seller):
-            act[i * 2] = act[i * 2] * (self.max_seller_price[i] - self.min_seller_price[i]) / 2 + (
-                    self.max_seller_price[i] + self.min_seller_price[i]) / 2
-            act[i * 2 + 1] = act[i * 2 + 1] * (self.max_seller_volume[i] - self.min_seller_volume[i]) / 2 + (
-                    self.max_seller_volume[i] + self.min_seller_volume[i]) / 2
+    # TODO: Understand and Change
+    def action_strategy(self, action):
+        """Recover action vector from normalized output, i.e. mapping its components from [-1, 1] to [min, max].
+        :param Normalized action: [seller0_price_lower, seller0_price_range_factor, seller0_volume, ...,
+                        buyer0_price, placeholder, buyer0_volume, ...]
+        :return: Real action vector.
+                 [seller0_price_lower, seller0_price_upper, seller0_volume, ...,
+                  buyer0_price, placeholder, buyer0_volume, ...]
+        """
+        _action = []
+        _action.extend(action)
 
-        for i in range(self.num_of_buyer):
-            act[i * 2 + self.num_of_seller * 2] = act[i * 2 + self.num_of_seller * 2] * \
-                                                  (self.max_buyer_price[i] - self.min_buyer_price[i]) / 2 + (
-                                                          self.max_buyer_price[i] + self.min_buyer_price[i]) / 2
-            act[i * 2 + 1 + self.num_of_seller * 2] = act[i * 2 + 1 + self.num_of_seller * 2] * \
-                                                      (self.max_buyer_volume[i] - self.min_buyer_volume[i]) / 2 + (
-                                                              self.max_buyer_volume[i] + self.min_buyer_volume[
-                                                          i]) / 2
-        return act
+        for i in range(self.num_of_seller):
+            max_price = self.max_seller_price[i]
+            min_price = self.min_seller_price[i]
+            max_volume = self.max_seller_volume[i]
+            min_volume = self.min_seller_volume[i]
+            # price_lower: [-1, 1] -> [min_price, max_price]
+            price_lower = _action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
+            # PRF -> seller_price_upper: [-1, 1] -> [price_lower, max_price]
+            price_upper = _action[3*i+1] = (_action[3*i+1] + 1) * (max_price - price_lower) / 2 + price_lower
+            # volume: [-1, 1] -> [min_volume, max_volume]
+            volume = _action[3*i+2] = (_action[3*i+2] + 1) * (max_volume - min_volume) / 2 + min_volume
+
+        for i in range(self.num_of_seller, self.n):
+            idx = i - self.num_of_seller
+            max_price = self.max_buyer_price[idx]
+            min_price = self.min_buyer_price[idx]
+            max_volume = self.max_buyer_volume[idx]
+            min_volume = self.min_buyer_volume[idx]
+            # price: [-1, 1] -> [min_price, max_price]
+            price = _action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
+            # placeholder: -> 0
+            placeholder = _action[3*i+1] = 0
+            # volume: [-1, 1] -> [min_volume, max_volume]
+            volume = _action[3*i+2] = (_action[3*i+2] + 1) * (max_volume - min_volume) / 2 + min_volume
+
+        return _action
