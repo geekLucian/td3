@@ -4,11 +4,9 @@ import time
 import numpy as np
 import tensorflow as tf
 
+from matd3.environments.myenv.env_range import RangeEnv
 from matd3.agents.matd3 import MATD3Agent
 from matd3.common.logger import RLLogger
-# ----------------
-from matd3.environments.myenv.make_env import make_env
-# ----------------
 
 # 设置GPU显存动态分配
 
@@ -24,7 +22,7 @@ def train(exp_name='multi_agent',  # 指定本次实验的命名
           num_episodes=1500  # 指定最多训练多少episode，然后终止训练
           ):
     # 创建环境
-    env = make_env()
+    env = RangeEnv()
 
     # 创建记录器，用于记录训练时的各种数据
     logger = RLLogger(exp_name, env.n, save_episode_rate)
@@ -100,9 +98,11 @@ def train(exp_name='multi_agent',  # 指定本次实验的命名
             for i in range(env.num_of_seller):
                 logger.log_scalar('seller_{}/profit'.format(i), seller_profit[i], step_type='episode')
                 logger.log_scalar('seller_{}/volume'.format(i), seller_clear_volume[i], step_type='episode')
+                logger.log_scalar('seller_{}/price'.format(i), clear_price[i], step_type='episode')
             for i in range(env.num_of_buyer):
                 logger.log_scalar('buyer_{}/volume'.format(i), buyer_clear_volume[i], step_type='episode')
-            logger.log_scalar('training/clear_price', clear_price, step_type='episode')
+                logger.log_scalar('buyer_{}/price'.format(i), clear_price[i+env.num_of_seller], step_type='episode')
+            # logger.log_scalar('training/clear_price', clear_price, step_type='episode')
             logger.log_scalar('training/total_profit', profit, step_type='episode')
             logger.log_scalar('training/total_match_volume', total_match_volume, step_type='episode')
 
