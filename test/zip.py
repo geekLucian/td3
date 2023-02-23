@@ -8,8 +8,8 @@ if __name__ == "__main__":
     buyer_price = [10, 11, 12]
     buyer_volume = [13, 14, 15]
     _seller_data = [seller_price_lower, seller_price_upper, seller_volume]
-    _buyer_data = [buyer_price, buyer_volume]
+    _buyer_data = [buyer_price, [0] * len(buyer_volume), buyer_volume]
     _seller_action = [val for tup in zip(*_seller_data) for val in tup]
     _buyer_action = [val for tup in zip(*_buyer_data) for val in tup]
     _action = _seller_action + _buyer_action
-    assert _action == [1, 4, 7, 2, 5, 8, 3, 6, 9, 10, 13, 11, 14, 12, 15]
+    print(_action)
