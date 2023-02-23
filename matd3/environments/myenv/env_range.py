@@ -13,7 +13,6 @@ NUM_OF_BUYER = len(np.loadtxt("data2/buyer_data.txt"))
 
 
 class RangeEnv(gym.Env):
-    # TODO: 以下函数必须补充实现
     def __init__(self):
         """初始化环境"""
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
@@ -62,12 +61,12 @@ class RangeEnv(gym.Env):
 
         # TODO: Update usage
         # 设定动作空间
-        # action_space = [Box(seller0_price_lower, seller0_volume, seller0_price_range_factor), ...,
+        # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
         #                 Box(buyer0_price, buyer0_volume), ...]
         # Price_Range_Factor(PRF) = (Price_Upper - Price_Lower) / (Max_Price - Min_Price), 0 <= PRF <= 1
         for i in range(self.num_of_seller):
-            self.action_space.append(spaces.Box(low=np.append(act_low[2*i: 2*i+2], 0),
-                                                high=np.append(act_high[2*i: 2*i+2], 1),
+            self.action_space.append(spaces.Box(low=np.array([act_low[2*i], 0, act_low[2*i+1]]),
+                                                high=np.array([act_high[2*i], 1, act_high[2*i+1]]),
                                                 shape=(3,), dtype=np.float32))
         for i in range(self.num_of_seller, self.n):
             self.action_space.append(spaces.Box(low=act_low[2*i: 2*i+2],
@@ -249,22 +248,22 @@ class RangeEnv(gym.Env):
         pass
 
     # TODO: test
-    def get_match_result(self, action):
+    def get_match_result(self, _action):
         """
         获取匹配出清结果
-        :param action: [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, buyer0_volume, ...]
+        :param _action: [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, buyer0_volume, ...]
         :return: match_result = [[buyer_name, seller_name, match_volume, match_price], ...]
         """
         # ======================= Data Unpack ==========================
         seller_price_lower, seller_price_upper, seller_volume, buyer_price, buyer_volume = [], [], [], [], []
         seller_name, buyer_name = list(range(self.num_of_seller)), list(range(self.num_of_buyer))
         for idx in range(self.num_of_seller):
-            seller_price_lower.append(action[3 * idx])
-            seller_price_upper.append(action[3 * idx + 1])
-            seller_volume.append(action[3 * idx + 2])
+            seller_price_lower.append(_action[3 * idx])
+            seller_price_upper.append(_action[3 * idx + 1])
+            seller_volume.append(_action[3 * idx + 2])
         for idx in range(self.num_of_buyer):
-            buyer_price.append(action(self.num_of_seller + 2 * idx))
-            buyer_volume.append(action(self.num_of_seller + 2 * idx + 1))
+            buyer_price.append(_action(self.num_of_seller + 2 * idx))
+            buyer_volume.append(_action(self.num_of_seller + 2 * idx + 1))
 
         # ======================= Price Rank ==========================
         seller_data = zip(seller_price_lower, seller_price_upper, seller_volume, seller_name)
@@ -345,6 +344,4 @@ class RangeEnv(gym.Env):
                                                       (self.max_buyer_volume[i] - self.min_buyer_volume[i]) / 2 + (
                                                               self.max_buyer_volume[i] + self.min_buyer_volume[
                                                           i]) / 2
-        # print("unact:", unact)
         return act
-    # # 根据上轮出清价格决定本轮购电方动作
