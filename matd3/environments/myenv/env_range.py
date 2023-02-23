@@ -222,9 +222,10 @@ class RangeEnv(gym.Env):
         # ====================== Generate Ranges =======================
         seller_price = sorted(seller_price_lower + seller_price_upper)
         seller_clearance_price = []  # 卖方出清价格，为其 下限价格（区间下界） 和 最小的大于其下限价格（区间上界） 的平均
+        max_price = max(seller_price)
         for i in range(self.num_of_seller):
             lower_bound = seller_price_lower[i]
-            upper_bound = next(price for price in seller_price if price > lower_bound)
+            upper_bound = next(_ for _ in seller_price if _ > lower_bound) if lower_bound < max_price else max_price
             seller_clearance_price.append((lower_bound + upper_bound) / 2)
 
         # ==================== Matching Clearance ======================
