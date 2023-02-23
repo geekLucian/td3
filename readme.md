@@ -1,6 +1,8 @@
 # TODO
 
 - [ ] 改网络结构，对卖方增加一个维度的输出，卖方报价 -> [卖方报价下限， 卖方报价上限]
+  - [ ] `action_space`
+  - [ ] `observation_space`
 - [ ] `gym.env`的`step()`和`reset()` [tutorial](https://blog.paperspace.com/getting-started-with-openai-gym/)
   - [x] `reset()`
   - [ ] `step()`
