@@ -195,7 +195,7 @@ class RangeEnv(gym.Env):
                                   for i in range(self.num_of_seller)])
 
         return (state, reward, clear_price, total_match_volume, seller_reported_volume, buyer_reported_volume,
-                match_result, seller_profit, end_reason, False, None)
+                match_result, seller_profit, end_reason, _action, False, None)
 
     def render(self, mode='human'):
         """渲染环境，如果无法渲染，则不实现"""
