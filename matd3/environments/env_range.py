@@ -282,8 +282,8 @@ class RangeEnv(gym.Env):
         for i in range(len(match_result)):
             buyer_name = int(match_result[i][0])
             seller_name = int(match_result[i][1])
-            match_volume = int(match_result[i][2])
-            match_price = int(match_result[i][3])
+            match_volume = match_result[i][2]
+            match_price = match_result[i][3]
             match_value = match_volume * match_price
             seller_avg_price[seller_name] = (
                     (seller_avg_price[seller_name] * seller_reported_volume[seller_name] + match_value)
