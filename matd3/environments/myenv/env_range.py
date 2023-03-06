@@ -37,7 +37,6 @@ class RangeEnv(gym.Env):
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
         self.action_space = self.observation_space = []
-        # TODO: Update usage
         # 设定动作空间
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
         #                 Box(buyer0_price, placeholder, buyer0_volume), ...]
@@ -49,8 +48,8 @@ class RangeEnv(gym.Env):
                                           high=np.array([self.max_seller_price[i], 1, self.max_seller_volume[i]]),
                                           shape=(3,), dtype=np.float32) for i in range(self.num_of_seller)]
         buyer_action_space = [spaces.Box(low=np.array([self.min_buyer_price[i], 0, self.min_buyer_volume[i]]),
-                                          high=np.array([self.max_buyer_price[i], 0, self.max_buyer_volume[i]]),
-                                          shape=(3,), dtype=np.float32) for i in range(self.num_of_buyer)]
+                                         high=np.array([self.max_buyer_price[i], 0, self.max_buyer_volume[i]]),
+                                         shape=(3,), dtype=np.float32) for i in range(self.num_of_buyer)]
         self.action_space = seller_action_space + buyer_action_space
         max_volume = max(np.max(self.max_seller_volume), np.max(self.max_buyer_volume))
         max_price = max(np.max(self.max_seller_price), np.max(self.max_buyer_price))
@@ -125,7 +124,7 @@ class RangeEnv(gym.Env):
 
         # ========================= 出清 ===========================
         # match_result := [[buyer_name, seller_name, match_volume, match_price], ...]
-        match_result = self.get_match_result(_action)
+        match_result, end_reason = self.get_match_result(_action)
         seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
         # ======================= 更新状态 ==========================
@@ -139,7 +138,7 @@ class RangeEnv(gym.Env):
 
         clear_price = np.append(seller_avg_price, buyer_avg_price)
         # TODO: 1. reward 仅为卖方回报； 2. 更新所有调用此函数的clear_price（由标量变为了1d向量）
-        return state, reward, clear_price
+        return state, reward, clear_price, end_reason
 
     # TODO: test
     def step(self, action: List[np.ndarray]):
@@ -165,7 +164,7 @@ class RangeEnv(gym.Env):
 
         # Map NN output vector's component from [-1, 1] into real values
         _action = self.action_strategy(np.array(action).flatten())
-        match_result = self.get_match_result(_action)
+        match_result, end_reason = self.get_match_result(_action)
         total_match_volume = calculate_total_amount(match_result)
         seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
@@ -185,8 +184,8 @@ class RangeEnv(gym.Env):
                                   for i in range(self.num_of_seller)])
 
         # TODO: 1. update usage (clear_price->vector) 2. done = itr >= EPISODE_LENGTH
-        return state, reward, clear_price, total_match_volume, seller_reported_volume, buyer_reported_volume, \
-               match_result, seller_profit, False, None
+        return (state, reward, clear_price, total_match_volume, seller_reported_volume, buyer_reported_volume,
+                match_result, seller_profit, end_reason, False, None)
 
     def render(self, mode='human'):
         """渲染环境，如果无法渲染，则不实现"""
@@ -199,6 +198,7 @@ class RangeEnv(gym.Env):
         :param _action: [seller0_price_lower, seller0_price_upper, seller0_volume, ...,
                          buyer0_price, placeholder, buyer0_volume, ...]
         :return: match_result = [[buyer_name, seller_name, match_volume, match_price], ...]
+        :return end_reason 出清结束的原因 := 剩下未成交的买方价格低于卖方价格 || 卖方卖完 || 买方买完
         """
         # ======================= Data Unpack ==========================
         seller_price_lower, seller_price_upper, seller_volume, buyer_price, buyer_volume = [], [], [], [], []
@@ -208,8 +208,8 @@ class RangeEnv(gym.Env):
             seller_price_upper.append(_action[3 * idx + 1])
             seller_volume.append(_action[3 * idx + 2])
         for idx in range(self.num_of_buyer):
-            buyer_price.append(_action[self.num_of_seller + 3 * idx])
-            buyer_volume.append(_action[self.num_of_seller + 3 * idx + 2])
+            buyer_price.append(_action[(self.num_of_seller + idx) * 3])
+            buyer_volume.append(_action[(self.num_of_seller + idx) * 3 + 2])
 
         # ======================= Price Rank ==========================
         seller_data = zip(seller_price_lower, seller_price_upper, seller_volume, seller_name)
@@ -249,15 +249,30 @@ class RangeEnv(gym.Env):
             matching_volume = min(matching_seller_volume, matching_buyer_volume)
             seller_volume[matching_seller_idx] -= matching_volume
             buyer_volume[matching_buyer_idx] -= matching_volume
-            matching_result.append([matching_buyer_name, matching_seller_name, matching_price, matching_volume])
+            matching_result.append([matching_buyer_name, matching_seller_name, matching_volume, matching_price])
             # update index and price
             if seller_volume[matching_seller_idx] == 0:
                 matching_seller_idx += 1
-                matching_seller_price = seller_clearance_price[matching_seller_idx]
+                try:
+                    matching_seller_price = seller_clearance_price[matching_seller_idx]
+                except IndexError:
+                    pass  # do nothing, the loop will end by itself
             if buyer_volume[matching_buyer_idx] == 0:
                 matching_buyer_idx += 1
-                matching_buyer_price = buyer_price[matching_buyer_idx]
-        return matching_result
+                try:
+                    matching_buyer_price = buyer_price[matching_buyer_idx]
+                except IndexError:
+                    pass  # do nothing, the loop will end by itself
+
+        end_reason = ""
+        if not matching_buyer_price > matching_seller_price:
+            end_reason += "剩下未成交的买方价格低于卖方价格 "
+        if not matching_seller_idx < self.num_of_seller:
+            end_reason += "卖方卖完 "
+        if not matching_buyer_idx < self.num_of_buyer:
+            end_reason += "买方买完 "
+
+        return matching_result, end_reason
 
     def statistics(self, match_result):
         seller_reported_volume = np.zeros(self.num_of_seller)   # 售电方各自的成交量
@@ -284,12 +299,8 @@ class RangeEnv(gym.Env):
             buyer_reported_volume[buyer_name] += match_volume
         return seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price
 
-    # 售电侧成本
     def calculate_cost(self, reported_volume):
-        """
-        :param reported_volume: 申报的电量:list ，不是匹配后的电量
-        :return: 长度为 num_of_seller的list，里面是float
-        """
+        """Caculate seller's cost accroding to its reported volume based on given cost function."""
         result = np.zeros(self.num_of_seller)
         for i in range(self.num_of_seller):
             cost = self.costfunction_for_sellers[i][0] * reported_volume[i] ** 2 + self.costfunction_for_sellers[i][1] * \
@@ -297,8 +308,6 @@ class RangeEnv(gym.Env):
             result[i] = cost
         return result
 
-    # 根据价格生成策略
-    # TODO: Understand and Change
     def action_strategy(self, action):
         """Recover action vector from normalized output, i.e. mapping its components from [-1, 1] to [min, max].
         :param Normalized action: [seller0_price_lower, seller0_price_range_factor, seller0_volume, ...,
