@@ -1,5 +1,5 @@
 import unittest
-from matd3.environments.myenv.env_range import RangeEnv
+from RangeEnv import RangeEnv
 
 
 class TestMatch(unittest.TestCase):
