@@ -71,7 +71,9 @@ class RLLogger(object):
         for idx, agent in enumerate(agents):
             agent.save(os.path.join(self.model_path, 'agent_{}'.format(idx)))
 
-    def log_scalar(self, k, v, step_type='train_step'):
+    def log_scalar(self, k, v, step_type='train_step', skip=False):
+        if skip:
+            return
         if step_type == 'train_step':
             step = self.train_step
         elif step_type == 'episode':
