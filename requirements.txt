@@ -1,5 +1,6 @@
+python>=3.8
 tensorflow
 tensorflow-gpu
-numpy
 gym
+numpy
 pandas

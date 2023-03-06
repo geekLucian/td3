@@ -3,14 +3,13 @@
 ## Project structure
 ```text
 .
-├── train_range.py      # enter point, simulate the market with reinforcement learning
 ├── common              # common utils (loggers)
 ├── data                # condition data (seller/buyer price/volume limits and seller's cost function)
-├── matd3               # core MATD3 algorithm and trading environment
+├── main.py             # simulate the market with multi-agent reinforcement learning
+├── matd3               # core MATD3 algorithm, trading environment and unit tests
 ├── readme.md           # this user guide
 ├── requirements.txt    # package dependencies
-├── results             # trained models and logs
-└── test                # unit tests
+└── results             # trained models and logs
 ```
 
 ## Getting started
@@ -18,7 +17,7 @@
 Create environments (`conda activate <env_name>` if already created):
 
 ```commandline
-conda create --name <env_name> --file requirements.txt
+conda create --name <env_name> --channel conda-forge --file requirements.txt
 ```
 
 Train:
