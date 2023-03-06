@@ -3,8 +3,7 @@
 ## Project structure
 ```text
 .
-├── data                # legacy
-├── data2               # seller/buyer price/volume limits and seller's cost function
+├── data                # seller/buyer price/volume limits and seller's cost function
 ├── matchTest.py        # matching method test (should be refactored into test directory)
 ├── matd3               # project src
 ├── readme.md           # this user guide
