@@ -5,7 +5,6 @@
 .
 ├── data                # legacy
 ├── data2               # seller/buyer price/volume limits and seller's cost function
-├── match_test.py       # matching method unit test (should be refactored into test directory)
 ├── matd3               # project src
 ├── readme.md           # this user guide
 ├── requirements.txt    # for building environments
@@ -37,6 +36,11 @@ tensorboard --logdir results
 ```
 
 Then open `http://localhost:6006` in browser to see the training logs
+
+To run unit test:
+```commandline
+python -m unittest matd3.test.<test_name>
+```
 
 ## TODO
 

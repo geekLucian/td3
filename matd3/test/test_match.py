@@ -2,7 +2,7 @@ import unittest
 from matd3.environments.myenv.env_range import RangeEnv
 
 
-class MatchTest(unittest.TestCase):
+class TestMatch(unittest.TestCase):
     """Partition based on matching end condition"""
     env = RangeEnv()
 
