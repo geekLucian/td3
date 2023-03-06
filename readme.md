@@ -5,7 +5,7 @@
 .
 ├── data                # legacy
 ├── data2               # seller/buyer price/volume limits and seller's cost function
-├── matchTest.py        # matching method test (should be refactored into test directory)
+├── match_test.py       # matching method unit test (should be refactored into test directory)
 ├── matd3               # project src
 ├── readme.md           # this user guide
 ├── requirements.txt    # for building environments
