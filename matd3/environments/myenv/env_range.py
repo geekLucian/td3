@@ -8,8 +8,8 @@ from os import path
 from typing import List
 from matd3.environments.utils import rank, generate_volume, select_clear_amount, calculate_total_amount
 
-NUM_OF_SELLER = len(np.loadtxt("data2/seller_data.txt"))
-NUM_OF_BUYER = len(np.loadtxt("data2/buyer_data.txt"))
+NUM_OF_SELLER = len(np.loadtxt("data/seller_data.txt"))
+NUM_OF_BUYER = len(np.loadtxt("data/buyer_data.txt"))
 
 
 class RangeEnv(gym.Env):
@@ -61,7 +61,7 @@ class RangeEnv(gym.Env):
                                              shape=(2,), dtype=np.float32) for _ in range(self.n)]
 
     # 输入售电方的最大申报量、最小申报量、成本模型信息，strategy文件存储：最大申报价格、最小申报价格、低价区间采购量范围、中价区间采购量范围、高价区间采购量范围
-    def set_data_for_seller(self, path="data2/seller_data.txt", path_strategy="data2/seller_strategy_data.txt"):
+    def set_data_for_seller(self, path="data/seller_data.txt", path_strategy="data/seller_strategy_data.txt"):
         """"
         设置卖方的数据：
             seller_data: [最大申报量, 最小申报量, 成本函数参数a_b, b_g, c_g]
@@ -80,7 +80,7 @@ class RangeEnv(gym.Env):
         self.min_seller_price = seller_strategy[:, 1]
 
     # 输入购电方的成本模型信息，strategy文件存储：最大申报价格、最小申报价格、低价区间采购量范围、中价区间采购量范围、高价区间采购量范围
-    def set_data_for_buyer(self, path="data2/buyer_data.txt", path_strategy="data2/buyer_strategy_data.txt"):
+    def set_data_for_buyer(self, path="data/buyer_data.txt", path_strategy="data/buyer_strategy_data.txt"):
         buyer_data = np.loadtxt(path)
         self.max_buyer_volume = buyer_data[:, 0]  # 读取各个卖方的最大申报电量
         self.min_buyer_volume = buyer_data[:, 1]  # 读取各个卖方的最小申报电量
