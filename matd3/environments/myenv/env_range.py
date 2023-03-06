@@ -132,9 +132,13 @@ class RangeEnv(gym.Env):
         buyer_state = [np.array([buyer_reported_volume[i], buyer_avg_price[i]]) for i in range(self.num_of_buyer)]
         state = seller_state + buyer_state
 
-        total_seller_cost = sum(self.calculate_cost(seller_reported_volume))  # 根据卖方成本函数计算成本
-        total_seller_value = np.dot(seller_reported_volume, seller_avg_price)
-        reward = total_seller_value - total_seller_cost  # 卖方回报
+        VOLUME_FIRST = True # TODO: replace with enum {VOLUME_FIRST, VALUE_FIRST, ...}
+        if VOLUME_FIRST:
+            reward = sum(seller_reported_volume)
+        else:
+            total_seller_cost = sum(self.calculate_cost(seller_reported_volume))  # 根据卖方成本函数计算成本
+            total_seller_value = np.dot(seller_reported_volume, seller_avg_price)
+            reward = total_seller_value - total_seller_cost  # 卖方回报
 
         clear_price = np.append(seller_avg_price, buyer_avg_price)
         # TODO: 1. reward 仅为卖方回报； 2. 更新所有调用此函数的clear_price（由标量变为了1d向量）
