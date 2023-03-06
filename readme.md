@@ -3,14 +3,15 @@
 ## Project structure
 ```text
 .
-├── data                # seller/buyer price/volume limits and seller's cost function
+├── train_range.py      # enter point, simulate the market with reinforcement learning
+├── common              # common utils (loggers)
+├── data                # condition data (seller/buyer price/volume limits and seller's cost function)
 ├── matchTest.py        # matching method test (should be refactored into test directory)
-├── matd3               # project src
+├── matd3               # core MATD3 algorithm and trading environment
 ├── readme.md           # this user guide
-├── requirements.txt    # for building environments
-├── results             # demonstrated below
-├── test                # unit test
-└── train_range.py      # enter point, simulate the market with reinforcement learning
+├── requirements.txt    # package dependencies
+├── results             # trained models and logs
+└── test                # unit tests
 ```
 
 ## Getting started
@@ -44,5 +45,4 @@ Open `http://localhost:6006` in browser
     - [ ] automated regression test
 - [ ] find better reward function
 - [ ] make logs and results prettier
-- [ ] remove legacies
 - [ ] translation
