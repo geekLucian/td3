@@ -75,7 +75,7 @@ def train(exp_name='range_pricing' + now,  # 指定本次实验的命名
 
         # 执行动作
         (new_obs_n, profit, clear_price, total_match_volume, seller_clear_volume, buyer_clear_volume, match_result,
-         seller_profit, end_reason, done, _) = env.step(action_n)
+         seller_profit, end_reason, action, done, _) = env.step(action_n)
         # 生成新状态、总利润、统一出清价格、总成交电量、售电方成交电量、购电方成交量、成交结果矩阵、标志位
 
         rew = 0 * profit + 1 * total_match_volume
@@ -98,8 +98,24 @@ def train(exp_name='range_pricing' + now,  # 指定本次实验的命名
         # 判断episode是否结束
         if done:
             if logger.episode_count % 100 == 0:
-                info("平均价格:\n [seller0_avg_price, seller1_avg_price, ..., buyer0_avg_price]\n" + str(clear_price))
-                info("交易记录:\n [[buyer_name, seller_name, match_volume, match_price]]\n\t\b" +
+                info("神经网络输出数据:\n"
+                    "   [[seller0_price_lower, seller0_price_range_factor, seller0_volume], ...,\n"
+                     "   [buyer0_price, placeholder, buyer0_volume], ...]\n\t" + 
+                     '\n\t'.join(map(str, action_n)))
+                action_msg = ""
+                for idx in range(len(action)):
+                    if idx % 3 == 0:
+                        action_msg += "\t["
+                    action_msg += "{}, ".format(action[idx])
+                    if idx % 3 == 2:
+                        action_msg += "\b\b]\n"
+
+                info("实际报价报量:\n"
+                    "\t[seller0_price_lower, seller0_price_upper, seller0_volume, ...,\n"
+                    "\t buyer0_price, placeholder, buyer0_volume, ...]\n" + 
+                     action_msg)
+                info("平均价格:\n[seller0_avg_price, seller1_avg_price, ..., buyer0_avg_price]\n" + str(clear_price))
+                info("交易记录:\n\t[[buyer_name, seller_name, match_volume, match_price]]\n\t" +
                      '\n\t'.join(map(str, match_result)))
                 info("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
             for i in range(env.num_of_seller):
