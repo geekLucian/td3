@@ -1,16 +1,22 @@
 import random
 import numpy as np
 import gym
+from enum import Enum
 from gym import spaces
-from typing import List
 
 NUM_OF_SELLER = len(np.loadtxt("data/seller_data.txt"))
 NUM_OF_BUYER = len(np.loadtxt("data/buyer_data.txt"))
 
+# The goal of optimizing, affecting how to caculate reward. Use VOLUME_FIRST here to maximize trading volume.
+# TODO: Implement the rest
+class Goal(Enum):
+    VALUE_FIRST = 1
+    VOLUME_FIRST = 2
+    SELLER_FIRST = 3
+    BUYER_FIRST = 4
 
 class RangeEnv(gym.Env):
     def __init__(self):
-        """初始化环境"""
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
         self.max_seller_volume = np.zeros(self.num_of_seller)   # 最大申报量
         self.min_seller_volume = np.zeros(self.num_of_seller)   # 最小申报量
@@ -32,8 +38,10 @@ class RangeEnv(gym.Env):
         self.buyer_name = ["buyer_%d" % i for i in range(self.num_of_buyer)]
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
+               
+        self.goal = Goal.VOLUME_FIRST 
+
         self.action_space = self.observation_space = []
-        # 设定动作空间
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
         #                 Box(buyer0_price, placeholder, buyer0_volume), ...]
         # Notes:
@@ -49,7 +57,6 @@ class RangeEnv(gym.Env):
         self.action_space = seller_action_space + buyer_action_space
         max_volume = max(np.max(self.max_seller_volume), np.max(self.max_buyer_volume))
         max_price = max(np.max(self.max_seller_price), np.max(self.max_buyer_price))
-        # 设定观测空间
         # observation_space = [Box(seller0_reported_volume, seller0_avg_price), ...,
         #                      Box(buyer0_reported_volume, buyer0_avg_price), ...]
         self.observation_space = [spaces.Box(low=np.array([0, 0]),
@@ -128,20 +135,19 @@ class RangeEnv(gym.Env):
         buyer_state = [np.array([buyer_reported_volume[i], buyer_avg_price[i]]) for i in range(self.num_of_buyer)]
         state = seller_state + buyer_state
 
-        VOLUME_FIRST = True # TODO: replace with enum {VOLUME_FIRST, VALUE_FIRST, ...}
-        if VOLUME_FIRST:
+        if self.goal == Goal.VOLUME_FIRST:
             reward = sum(seller_reported_volume)
-        else:
+        elif self.goal == Goal.SELLER_FIRST:
             total_seller_cost = sum(self.calculate_cost(seller_reported_volume))  # 根据卖方成本函数计算成本
             total_seller_value = np.dot(seller_reported_volume, seller_avg_price)
             reward = total_seller_value - total_seller_cost  # 卖方回报
+        else:
+            raise NotImplementedError
 
         clear_price = np.append(seller_avg_price, buyer_avg_price)
-        # TODO: 1. reward 仅为卖方回报； 2. 更新所有调用此函数的clear_price（由标量变为了1d向量）
         return state, reward, clear_price, end_reason
 
-    # TODO: test
-    def step(self, action: List[np.ndarray]):
+    def step(self, action):
         """
         执行一步动作。
         接收到的参数 action格式：列表，每一项是每个智能体的连续动作。每一项的数组维度是1
@@ -172,10 +178,15 @@ class RangeEnv(gym.Env):
         buyer_state = [np.array([buyer_reported_volume[i], buyer_avg_price[i]]) for i in range(self.num_of_buyer)]
         state = seller_state + buyer_state
 
-        total_seller_cost = sum(self.calculate_cost(seller_reported_volume))  # 根据卖方成本函数计算成本
-        total_seller_value = np.dot(seller_reported_volume, seller_avg_price)
-        reward = total_seller_value - total_seller_cost  # 卖方回报
-
+        if self.goal == Goal.VOLUME_FIRST:
+            reward = sum(seller_reported_volume)
+        elif self.goal == Goal.SELLER_FIRST:
+            total_seller_cost = sum(self.calculate_cost(seller_reported_volume))  # 根据卖方成本函数计算成本
+            total_seller_value = np.dot(seller_reported_volume, seller_avg_price)
+            reward = total_seller_value - total_seller_cost  # 卖方回报
+        else:
+            raise NotImplementedError
+        
         clear_price = np.append(seller_avg_price, buyer_avg_price)
 
         cost_result = self.calculate_cost(seller_reported_volume)  # 根据每个卖家出清量计算相应的各自的成本
@@ -183,7 +194,6 @@ class RangeEnv(gym.Env):
         seller_profit = np.array([seller_reported_volume[i] * clear_price[i] - cost_result[i]
                                   for i in range(self.num_of_seller)])
 
-        # TODO: 1. update usage (clear_price->vector) 2. done = itr >= EPISODE_LENGTH
         return (state, reward, clear_price, total_match_volume, seller_reported_volume, buyer_reported_volume,
                 match_result, seller_profit, end_reason, False, None)
 
@@ -191,7 +201,6 @@ class RangeEnv(gym.Env):
         """渲染环境，如果无法渲染，则不实现"""
         pass
 
-    # TODO: test
     @staticmethod
     def get_match_result(_action):
         """
