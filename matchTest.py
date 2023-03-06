@@ -1,5 +1,5 @@
 # import unittest
-from matd3.environments.myenv.env_range import RangeEnv
+from matd3.RangeEnv import RangeEnv
 
 
 def match_test():
@@ -75,8 +75,7 @@ def match_test():
               [7, 3, 23856.468777179718, 352.1460656865068],
               [6, 3, 45195.15682923794, 351.96832910613495]]
 
-    env = RangeEnv()
-    match_result, end_reason = env.get_match_result(action2)
+    match_result, end_reason = RangeEnv.get_match_result(action2)
     print("交易记录:\n [[buyer_name, seller_name, match_volume, match_price]]\n\t\b",
           '\n\t'.join(map(str, match_result)))
     print("共{}条，出清中止原因：{}".format(len(match_result), end_reason))

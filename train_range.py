@@ -5,10 +5,10 @@ import numpy as np
 import tensorflow as tf
 from datetime import datetime
 
-from matd3.environments.env_range import RangeEnv
-from matd3.agents.matd3 import MATD3Agent
-from matd3.common.logger import RLLogger
-from matd3.common.util import info
+from matd3.MATD3Agent import MATD3Agent
+from matd3.RangeEnv import RangeEnv
+from common.RLLogger import RLLogger
+from common.util import info
 
 # 设置GPU显存动态分配
 if tf.config.experimental.list_physical_devices('GPU'):
