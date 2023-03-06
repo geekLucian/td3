@@ -43,10 +43,8 @@ python -m unittest matd3.test.<test_name>
 
 ## TODO
 
-- [ ] test and debug
-    - [ ] test `action_strategy` wich maps the NN's output to real values
-    - [ ] refactor with `unittest`
-    - [ ] automated regression test
+- [ ] test `action_strategy` wich maps the NN's output to real values
+- [ ] automated regression test
 - [ ] find better reward function
 - [ ] make logs and results prettier
 - [ ] translation
