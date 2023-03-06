@@ -3,15 +3,14 @@
 ## Project structure
 ```text
 .
-├── data                # legacy
-├── data2               # seller/buyer price/volume limits and seller's cost function
-├── matd3               # project src
+├── train_range.py      # enter point, simulate the market with reinforcement learning
+├── common              # common utils (loggers)
+├── data                # condition data (seller/buyer price/volume limits and seller's cost function)
+├── matd3               # core MATD3 algorithm and trading environment
 ├── readme.md           # this user guide
-├── requirements.txt    # for building environments
-├── results             # demonstrated below
-├── test                # unit test
-├── train.py            # legacy
-└── train_range.py      # enter point, simulate the market with reinforcement learning
+├── requirements.txt    # package dependencies
+├── results             # trained models and logs
+└── test                # unit tests
 ```
 
 ## Getting started
@@ -50,5 +49,4 @@ python -m unittest matd3.test.<test_name>
     - [ ] automated regression test
 - [ ] find better reward function
 - [ ] make logs and results prettier
-- [ ] remove legacies
 - [ ] translation
