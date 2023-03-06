@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 from datetime import datetime
 
-from matd3.environments.myenv.env_range import RangeEnv
+from matd3.environments.env_range import RangeEnv
 from matd3.agents.matd3 import MATD3Agent
 from matd3.common.logger import RLLogger
 from matd3.common.util import info

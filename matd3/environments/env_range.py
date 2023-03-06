@@ -1,12 +1,8 @@
-import math
 import random
-import pandas as pd
 import numpy as np
 import gym
 from gym import spaces
-from os import path
 from typing import List
-from matd3.environments.utils import rank, generate_volume, select_clear_amount, calculate_total_amount
 
 NUM_OF_SELLER = len(np.loadtxt("data/seller_data.txt"))
 NUM_OF_BUYER = len(np.loadtxt("data/buyer_data.txt"))
@@ -169,7 +165,7 @@ class RangeEnv(gym.Env):
         # Map NN output vector's component from [-1, 1] into real values
         _action = self.action_strategy(np.array(action).flatten())
         match_result, end_reason = self.get_match_result(_action)
-        total_match_volume = calculate_total_amount(match_result)
+        total_match_volume = sum(match_result[i][2] for i in range(len(match_result))) 
         seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
         seller_state = [np.array([seller_reported_volume[i], seller_avg_price[i]]) for i in range(self.num_of_seller)]

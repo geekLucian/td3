@@ -10,7 +10,6 @@
 ├── requirements.txt    # for building environments
 ├── results             # demonstrated below
 ├── test                # unit test
-├── train.py            # legacy
 └── train_range.py      # enter point, simulate the market with reinforcement learning
 ```
 
