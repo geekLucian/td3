@@ -8,7 +8,7 @@ import tensorflow as tf
 
 class RLLogger(object):
 
-    def __init__(self, exp_name, n_agents, save_episode_rate):
+    def __init__(self, exp_name, n_agents, save_episode_rate, skip_log=False):
         '''
         '''
         self.n_agents = n_agents  # 智能体数量
@@ -33,6 +33,8 @@ class RLLogger(object):
         self.t_last_print = time.time()  # 记录上一次打印信息的时间
 
         self.save_episode_rate = save_episode_rate  # 隔多少次保存模型
+
+        self.skip_log = skip_log    # Optional skipping log from faster experiments
 
     def record_episode_end(self, agents):
         """
@@ -71,8 +73,8 @@ class RLLogger(object):
         for idx, agent in enumerate(agents):
             agent.save(os.path.join(self.model_path, 'agent_{}'.format(idx)))
 
-    def log_scalar(self, k, v, step_type='train_step', skip=False):
-        if skip:
+    def log_scalar(self, k, v, step_type='train_step'):
+        if self.skip_log:
             return
         if step_type == 'train_step':
             step = self.train_step
