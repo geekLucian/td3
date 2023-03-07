@@ -17,19 +17,22 @@ if tf.config.experimental.list_physical_devices('GPU'):
 now = datetime.now().strftime("-%Y-%m-%d-%H-%M-%S")
 
 
-def train(exp_name='range_pricing' + now,  # 指定本次实验的命名
-          save_episode_rate=20,  # 指定多久保存一次模型，输出结果
-          display=False,  # 是否渲染环境
-          restore_filepath=None,  # 指定加载已存在模型的路径，比如 "results/xxx/models"
-          max_episode_len=10,  # 指定每个episode最长多少步
-          num_episodes=1500  # 指定最多训练多少episode，然后终止训练
+def train(exp_name='range_pricing' + now,   # 指定本次实验的命名
+          save_episode_rate=20,             # 指定多久保存一次模型，输出结果
+          display=False,                    # 是否渲染环境
+          restore_filepath=None,            # 指定加载已存在模型的路径，比如 "results/xxx/models"
+          max_episode_len=10,               # 指定每个episode最长多少步
+          num_episodes=1500,                # 指定最多训练多少episode，然后终止训练
+          skip_log=False                    # Whether disable logging
           ):
+    if skip_log:
+        print("Log disabled")
+        exp_name += "_nolog"
+    logger = RLLogger(exp_name, env.n, save_episode_rate, skip_log)
+    tf.summary.trace_on(graph=False)
+
     # 创建环境
     env = RangeEnv()
-
-    # 创建记录器，用于记录训练时的各种数据
-    logger = RLLogger(exp_name, env.n, save_episode_rate)
-    tf.summary.trace_on(graph=False)
 
     # 创建智能体
     agents = []
@@ -65,35 +68,24 @@ def train(exp_name='range_pricing' + now,  # 指定本次实验的命名
     # 开始迭代收集数据，训练
     print('Starting iterations...')
     while True:
-        # get action
         if logger.episode_count > 180:
             action_n = [agent.action(obs.astype(np.float32), 0.2 / (logger.train_step / 1500 + 1)) for agent, obs in
                         zip(agents, obs_n)]
         else:
             action_n = [agent.policy.sample_action().numpy() for agent, obs in zip(agents, obs_n)]
-            # print(action_n)
 
         # 执行动作
         (new_obs_n, profit, clear_price, total_match_volume, seller_clear_volume, buyer_clear_volume, match_result,
          seller_profit, end_reason, action, done, _) = env.step(action_n)
-        # 生成新状态、总利润、统一出清价格、总成交电量、售电方成交电量、购电方成交量、成交结果矩阵、标志位
-
+        done |= (logger.episode_step >= max_episode_len)  # 判断当前episode的步长是否已经超过设定的最大步长限制
         rew = 0 * profit + 1 * total_match_volume
-
-        # episode 时间步 +1
         logger.episode_step += 1
-
-        # 判断是否结束episode
-        terminal = (logger.episode_step >= max_episode_len)  # 判断当前episode的步长是否已经超过设定的最大步长限制
-        done = done or terminal
+        logger.episode_rewards[-1] += rew
 
         # 保存经验到各个策略的经验池中
         for i, agent in enumerate(agents):
             agent.add_transition(obs_n, action_n, rew, new_obs_n, done)
         obs_n = new_obs_n  # 设定新状态
-
-        # 记录奖励
-        logger.episode_rewards[-1] += rew
 
         # 判断episode是否结束
         if done:
@@ -153,4 +145,7 @@ def printlog(action_n, action, clear_price, match_result, end_reason):
     info("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
 
 if __name__ == '__main__':
-    train()
+    # TODO: Make options avaiable from cmd line
+    skip_log = False
+    pretrained = False
+    train(skip_log=skip_log, restore_filepath="results/range_pricing_pretrained/models" if pretrained else None)

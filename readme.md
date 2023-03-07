@@ -23,13 +23,12 @@ conda create --name <env_name> --channel conda-forge --file requirements.txt
 Train:
 
 ```commandline
-python ./train_env.py
+python main.py 2> err.log | tee out.log
 ```
 
 This will create `./results` directory, which saves training log and trained model. To check the training process:
 
 ```commandline
-cd ./results/<exp_name>
 tensorboard --logdir results
 ```
 
