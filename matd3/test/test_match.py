@@ -4,10 +4,8 @@ from RangeEnv import RangeEnv
 
 class TestMatch(unittest.TestCase):
     """Partition based on matching end condition"""
-    env = RangeEnv()
-
     def debug_get_match_result(self, _action):
-        match_result, end_reason = self.env.get_match_result(_action)
+        match_result, end_reason = RangeEnv.get_match_result(_action)
         print("交易记录:\n [[buyer_name, seller_name, match_volume, match_price]]\n\t\b",
               '\n\t'.join(map(str, match_result)))
         print("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
