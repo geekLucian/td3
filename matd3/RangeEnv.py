@@ -7,8 +7,8 @@ from gym import spaces
 NUM_OF_SELLER = len(np.loadtxt("data/seller_data.txt"))
 NUM_OF_BUYER = len(np.loadtxt("data/buyer_data.txt"))
 
-# The goal of optimizing, affecting how to caculate reward. Use VOLUME_FIRST here to maximize trading volume.
 # TODO: Implement the rest
+# The goal of optimizing, affecting how to calculate reward.
 class Goal(Enum):
     VALUE_FIRST = 1
     VOLUME_FIRST = 2
@@ -16,6 +16,9 @@ class Goal(Enum):
     BUYER_FIRST = 4
 
 class RangeEnv(gym.Env):
+    # Use VOLUME_FIRST here to maximize trading volume.
+    goal = Goal.VOLUME_FIRST
+
     def __init__(self):
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
         self.max_seller_volume = np.zeros(self.num_of_seller)   # 最大申报量
@@ -39,7 +42,6 @@ class RangeEnv(gym.Env):
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
                
-        self.goal = Goal.VOLUME_FIRST 
 
         self.action_space = self.observation_space = []
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,

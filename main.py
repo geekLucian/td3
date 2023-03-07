@@ -98,26 +98,7 @@ def train(exp_name='range_pricing' + now,  # 指定本次实验的命名
         # 判断episode是否结束
         if done:
             if logger.episode_count % 100 == 0:
-                info("神经网络输出数据:\n"
-                    "   [[seller0_price_lower, seller0_price_range_factor, seller0_volume], ...,\n"
-                     "   [buyer0_price, placeholder, buyer0_volume], ...]\n\t" + 
-                     '\n\t'.join(map(str, action_n)))
-                action_msg = ""
-                for idx in range(len(action)):
-                    if idx % 3 == 0:
-                        action_msg += "\t["
-                    action_msg += "{}, ".format(action[idx])
-                    if idx % 3 == 2:
-                        action_msg += "\b\b]\n"
-
-                info("实际报价报量:\n"
-                    "\t[seller0_price_lower, seller0_price_upper, seller0_volume, ...,\n"
-                    "\t buyer0_price, placeholder, buyer0_volume, ...]\n" + 
-                     action_msg)
-                info("平均价格:\n[seller0_avg_price, seller1_avg_price, ..., buyer0_avg_price]\n" + str(clear_price))
-                info("交易记录:\n\t[[buyer_name, seller_name, match_volume, match_price]]\n\t" +
-                     '\n\t'.join(map(str, match_result)))
-                info("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
+                printlog(action_n, action, clear_price, match_result, end_reason)
             for i in range(env.num_of_seller):
                 logger.log_scalar('seller_{}/profit'.format(i), seller_profit[i], step_type='episode')
                 logger.log_scalar('seller_{}/volume'.format(i), seller_clear_volume[i], step_type='episode')
@@ -150,6 +131,26 @@ def train(exp_name='range_pricing' + now,  # 指定本次实验的命名
             logger.experiment_end()
             break
 
+def printlog(action_n, action, clear_price, match_result, end_reason):
+    action_msg = ""
+    for idx in range(len(action)):
+        if idx % 3 == 0:
+            action_msg += "\t["
+        action_msg += "{}, ".format(action[idx])
+        if idx % 3 == 2:
+            action_msg += "\b\b]\n"
+    info("神经网络输出数据:\n"
+        "   [[seller0_price_lower, seller0_price_range_factor, seller0_volume], ...,\n"
+            "   [buyer0_price, placeholder, buyer0_volume], ...]\n\t" + 
+            '\n\t'.join(map(str, action_n)))
+    info("实际报价报量:\n"
+        "\t[seller0_price_lower, seller0_price_upper, seller0_volume, ...,\n"
+        "\t buyer0_price, placeholder, buyer0_volume, ...]\n" + 
+            action_msg)
+    info("平均价格:\n\t[seller0_avg_price, seller1_avg_price, ..., buyer0_avg_price]\n" + str(clear_price))
+    info("交易记录:\n\t[[buyer_name, seller_name, match_volume, match_price]]\n\t" +
+            '\n\t'.join(map(str, match_result)))
+    info("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
 
 if __name__ == '__main__':
     train()
