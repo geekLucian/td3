@@ -25,14 +25,14 @@ def train(exp_name='range_pricing' + now,   # 指定本次实验的命名
           num_episodes=1500,                # 指定最多训练多少episode，然后终止训练
           skip_log=False                    # Whether disable logging
           ):
+    # 创建环境
+    env = RangeEnv()
+
     if skip_log:
         print("Log disabled")
         exp_name += "_nolog"
     logger = RLLogger(exp_name, env.n, save_episode_rate, skip_log)
     tf.summary.trace_on(graph=False)
-
-    # 创建环境
-    env = RangeEnv()
 
     # 创建智能体
     agents = []
@@ -147,5 +147,5 @@ def printlog(action_n, action, clear_price, match_result, end_reason):
 if __name__ == '__main__':
     # TODO: Make options avaiable from cmd line
     skip_log = False
-    pretrained = False
+    pretrained = True
     train(skip_log=skip_log, restore_filepath="results/range_pricing_pretrained/models" if pretrained else None)
