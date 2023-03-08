@@ -56,7 +56,7 @@ class MACriticNetwork(object):
         """
         预测Q值
         """
-        return self._predict_internal(obs_n + act_n)
+        return self._predict_internal(tf.convert_to_tensor(obs_n + act_n, dtype=tf.float32))
 
     @tf.function
     def _predict_internal(self, concatenated_input):
@@ -70,7 +70,7 @@ class MACriticNetwork(object):
         """
         训练值网络
         """
-        return self._train_step_internal(obs_n + act_n, target_q)
+        return self._train_step_internal(tf.convert_to_tensor(obs_n + act_n, dtype=tf.float32), target_q)
 
     @tf.function
     def _train_step_internal(self, concatenated_input, target_q):

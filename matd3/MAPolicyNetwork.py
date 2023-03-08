@@ -65,15 +65,15 @@ class MAPolicyNetwork(object):
 
     @tf.function
     def get_action(self, obs):
-        return self.forward_pass(obs)
+        return self.forward_pass(tf.convert_to_tensor(obs, dtype=tf.float32))
 
     @tf.function
     def train(self, obs_n, act_n):
         with tf.GradientTape() as tape:
-            x = self.forward_pass(obs_n[self.agent_index])
+            x = self.forward_pass(tf.convert_to_tensor(obs_n, dtype=tf.float32)[self.agent_index])
             act_n = tf.unstack(act_n)
             act_n[self.agent_index] = x  # 替换动作序列中，当前智能体的动作为新采样的，其他智能体的动作保持从经验池中采样的
-            q_value = self.q_network._predict_internal(obs_n + act_n)  # 预测Q值
+            q_value = self.q_network._predict_internal(tf.convert_to_tensor(obs_n + act_n, dtype=tf.float32))  # 预测Q值
             loss = -tf.math.reduce_mean(q_value)
 
         gradients = tape.gradient(loss, self.model.trainable_variables)
