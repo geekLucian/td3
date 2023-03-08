@@ -42,6 +42,7 @@ python -m unittest matd3.test.<test_name>
 ## TODO
 
 - [ ] test `action_strategy` wich maps the NN's output to real values
+- [ ] fix `tf.function retracing` wanrings by converting data structures into tensors
 - [ ] automated regression test
 - [ ] find better reward function
 - [ ] make logs and results prettier
