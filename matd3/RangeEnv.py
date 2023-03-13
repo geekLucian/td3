@@ -20,7 +20,7 @@ class RangeEnv(gym.Env):
     goal = Goal.VOLUME_FIRST
     init_action = []
     
-    def __init__(self, mode):
+    def __init__(self, mode, svs, bvs):
         self.mode = mode                                        # which experiment to run
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
         self.max_seller_volume = np.zeros(self.num_of_seller)   # 最大申报量
@@ -43,7 +43,8 @@ class RangeEnv(gym.Env):
         self.buyer_name = ["buyer_%d" % i for i in range(self.num_of_buyer)]
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
-               
+        self.seller_volume_scale = svs
+        self.buyer_volume_scale = bvs
 
         self.action_space = self.observation_space = []
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
@@ -115,10 +116,10 @@ class RangeEnv(gym.Env):
                               range(self.num_of_seller)]
         buyer_price = [random.uniform(self.min_buyer_price[i], self.max_buyer_price[i]) for i in
                        range(self.num_of_buyer)]
-        seller_volume = [random.uniform(self.min_seller_volume[i], self.max_seller_volume[i]) for i in
-                         range(self.num_of_seller)]
-        buyer_volume = [random.uniform(self.min_buyer_volume[i], self.max_buyer_volume[i]) for i in
-                        range(self.num_of_buyer)]
+        seller_volume = [random.uniform(self.min_seller_volume[i], self.max_seller_volume[i]) * self.seller_volume_scale
+                         for i in range(self.num_of_seller)]
+        buyer_volume = [random.uniform(self.min_buyer_volume[i], self.max_buyer_volume[i]) * self.buyer_volume_scale
+                         for i in range(self.num_of_buyer)]
 
         # Data Packing
         # _action data layout:
