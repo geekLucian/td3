@@ -25,10 +25,12 @@ def train(exp_name='range_pricing' + now,   # 指定本次实验的命名
           max_episode_len=10,               # 指定每个episode最长多少步
           num_episodes=1500,                # 指定最多训练多少episode，然后终止训练
           skip_log=False,                   # Whether disable logging
-          mode="normal"                     # Specify which experiments to run
+          mode="normal",                    # Specify which experiments to run
+          svs=1.0,                          # seller volume scale
+          bvs=1.0                           # buyer volume scale
           ):
     # 创建环境
-    env = RangeEnv(mode)
+    env = RangeEnv(mode, svs, bvs)
 
     if skip_log:
         print("Log disabled")
@@ -153,7 +155,13 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--mode', type=str, action='store', required=True, choices=[
         "normal", "reverse", "volume", "felxible"
     ])
+    parser.add_argument('-s', '--seller_volume_scale', type=float, action='store', default=1.0)
+    parser.add_argument('-b', '--buyer_volume_scale', type=float, action='store', default=1.0)
     args = parser.parse_args()
+    print(args.seller_volume_scale)
+    print(args.buyer_volume_scale)
     train(skip_log=(not args.log), 
           restore_filepath="results/range_pricing_pretrained/models" if args.pretrained else None,
-          mode=args.mode)
+          mode=args.mode,
+          svs=args.seller_volume_scale,
+          bvs=args.buyer_volume_scale)

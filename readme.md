@@ -41,6 +41,11 @@ python -m unittest matd3.test.<test_name>
 
 ## TODO
 
+results naming: `model_ratio`
+
+- model: normal, reverse, volume
+- ratio: blance, buyer_more (10%~20%), seller_more, buyer_much_more (>50%), seller_much_more
+
 - [ ] test `action_strategy` wich maps the NN's output to real values
 - [ ] fix `tf.function retracing` wanrings by converting data structures into tensors
 - [ ] automated regression test
