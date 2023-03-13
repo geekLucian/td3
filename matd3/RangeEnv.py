@@ -19,7 +19,8 @@ class RangeEnv(gym.Env):
     # Use VOLUME_FIRST here to maximize trading volume.
     goal = Goal.VOLUME_FIRST
 
-    def __init__(self):
+    def __init__(self, mode):
+        self.mode = mode                                        # which experiment to run
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
         self.max_seller_volume = np.zeros(self.num_of_seller)   # 最大申报量
         self.min_seller_volume = np.zeros(self.num_of_seller)   # 最小申报量
