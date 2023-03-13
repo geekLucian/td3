@@ -18,7 +18,8 @@ class Goal(Enum):
 class RangeEnv(gym.Env):
     # Use VOLUME_FIRST here to maximize trading volume.
     goal = Goal.VOLUME_FIRST
-
+    init_action = []
+    
     def __init__(self, mode):
         self.mode = mode                                        # which experiment to run
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
@@ -127,10 +128,12 @@ class RangeEnv(gym.Env):
         _seller_action = [val for tup in zip(*_seller_data) for val in tup]
         _buyer_action = [val for tup in zip(*_buyer_data) for val in tup]
         _action = _seller_action + _buyer_action
+        if not type(self).init_action:
+            type(self).init_action = _action
 
         # ========================= 出清 ===========================
         # match_result := [[buyer_name, seller_name, match_volume, match_price], ...]
-        match_result, end_reason = self.get_match_result(_action)
+        match_result, end_reason = self.get_match_result(_action, self.mode)
         seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
         # ======================= 更新状态 ==========================
@@ -173,7 +176,7 @@ class RangeEnv(gym.Env):
 
         # Map NN output vector's component from [-1, 1] into real values
         _action = self.action_strategy(np.array(action).flatten())
-        match_result, end_reason = self.get_match_result(_action)
+        match_result, end_reason = self.get_match_result(_action, self.mode)
         total_match_volume = sum(match_result[i][2] for i in range(len(match_result))) 
         seller_reported_volume, buyer_reported_volume, seller_avg_price, buyer_avg_price = self.statistics(match_result)
 
@@ -205,7 +208,7 @@ class RangeEnv(gym.Env):
         pass
 
     @staticmethod
-    def get_match_result(_action):
+    def get_match_result(_action, mode="normal"):
         """
         获取匹配出清结果
         :param _action: [seller0_price_lower, seller0_price_upper, seller0_volume, ...,
@@ -213,6 +216,7 @@ class RangeEnv(gym.Env):
         :return: match_result = [[buyer_name, seller_name, match_volume, match_price], ...]
         :return end_reason 出清结束的原因 := 剩下未成交的买方价格低于卖方价格 || 卖方卖完 || 买方买完
         """
+        reverse = (mode == "reverse")
         # ======================= Data Unpack ==========================
         seller_price_lower, seller_price_upper, seller_volume, buyer_price, buyer_volume = [], [], [], [], []
         seller_name, buyer_name = list(range(NUM_OF_SELLER)), list(range(NUM_OF_BUYER))
@@ -243,14 +247,18 @@ class RangeEnv(gym.Env):
 
         # ==================== Matching Clearance ======================
         matching_result = []
-        matching_seller_idx = 0
-        matching_buyer_idx = 0
-        matching_seller_price = seller_clearance_price[0]
-        matching_buyer_price = buyer_price[0]
+        matching_seller_idx = 0 if not reverse else NUM_OF_SELLER - 1
+        matching_buyer_idx = 0 if not reverse else NUM_OF_BUYER - 1
+        matching_seller_price = seller_clearance_price[matching_seller_idx]
+        matching_buyer_price = buyer_price[matching_buyer_idx]
+        while (reverse and matching_buyer_price < matching_seller_price):
+            # TODO: delete which side?
+            assert(0)
+        
         # 终止条件： 当前匹配的买方价格低于卖方价格 or 卖方卖完 or 买方买完
-        while (matching_buyer_price > matching_seller_price
-               and matching_seller_idx < NUM_OF_SELLER
-               and matching_buyer_idx < NUM_OF_BUYER):
+        while (matching_buyer_price >= matching_seller_price
+               and 0 <= matching_seller_idx < NUM_OF_SELLER
+               and 0 <= matching_buyer_idx < NUM_OF_BUYER):
             # name
             matching_seller_name = seller_name[matching_seller_idx]
             matching_buyer_name = buyer_name[matching_buyer_idx]
@@ -265,24 +273,24 @@ class RangeEnv(gym.Env):
             matching_result.append([matching_buyer_name, matching_seller_name, matching_volume, matching_price])
             # update index and price
             if seller_volume[matching_seller_idx] == 0:
-                matching_seller_idx += 1
+                matching_seller_idx += 1 if not reverse else -1
                 try:
                     matching_seller_price = seller_clearance_price[matching_seller_idx]
                 except IndexError:
                     pass  # do nothing, the loop will end by itself
             if buyer_volume[matching_buyer_idx] == 0:
-                matching_buyer_idx += 1
+                matching_buyer_idx += 1 if not reverse else -1
                 try:
                     matching_buyer_price = buyer_price[matching_buyer_idx]
                 except IndexError:
                     pass  # do nothing, the loop will end by itself
 
         end_reason = ""
-        if not matching_buyer_price > matching_seller_price:
+        if not matching_buyer_price >= matching_seller_price:
             end_reason += "剩下未成交的买方价格低于卖方价格 "
-        if not matching_seller_idx < NUM_OF_SELLER:
+        if not (0 <= matching_seller_idx < NUM_OF_SELLER):
             end_reason += "卖方卖完 "
-        if not matching_buyer_idx < NUM_OF_BUYER:
+        if not (0 <= matching_buyer_idx < NUM_OF_BUYER):
             end_reason += "买方买完 "
 
         return matching_result, end_reason
@@ -331,30 +339,41 @@ class RangeEnv(gym.Env):
         """
         _action = []
         _action.extend(action)
+        if (self.mode in ["flexible"]):
+            for i in range(self.num_of_seller):
+                max_price = self.max_seller_price[i]
+                min_price = self.min_seller_price[i]
+                max_volume = self.max_seller_volume[i]
+                min_volume = self.min_seller_volume[i]
+                # price_lower: [-1, 1] -> [min_price, max_price]
+                price_lower = _action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
+                # PRF -> seller_price_upper: [-1, 1] -> [price_lower, max_price]
+                price_upper = _action[3*i+1] = (_action[3*i+1] + 1) * (max_price - price_lower) / 2 + price_lower
+                # volume: [-1, 1] -> [min_volume, max_volume]
+                volume = _action[3*i+2] = (_action[3*i+2] + 1) * (max_volume - min_volume) / 2 + min_volume
 
-        for i in range(self.num_of_seller):
-            max_price = self.max_seller_price[i]
-            min_price = self.min_seller_price[i]
-            max_volume = self.max_seller_volume[i]
-            min_volume = self.min_seller_volume[i]
-            # price_lower: [-1, 1] -> [min_price, max_price]
-            price_lower = _action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
-            # PRF -> seller_price_upper: [-1, 1] -> [price_lower, max_price]
-            price_upper = _action[3*i+1] = (_action[3*i+1] + 1) * (max_price - price_lower) / 2 + price_lower
-            # volume: [-1, 1] -> [min_volume, max_volume]
-            volume = _action[3*i+2] = (_action[3*i+2] + 1) * (max_volume - min_volume) / 2 + min_volume
-
-        for i in range(self.num_of_seller, self.n):
-            idx = i - self.num_of_seller
-            max_price = self.max_buyer_price[idx]
-            min_price = self.min_buyer_price[idx]
-            max_volume = self.max_buyer_volume[idx]
-            min_volume = self.min_buyer_volume[idx]
-            # price: [-1, 1] -> [min_price, max_price]
-            price = _action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
-            # placeholder: -> 0
-            placeholder = _action[3*i+1] = 0
-            # volume: [-1, 1] -> [min_volume, max_volume]
-            volume = _action[3*i+2] = (_action[3*i+2] + 1) * (max_volume - min_volume) / 2 + min_volume
+            for i in range(self.num_of_seller, self.n):
+                idx = i - self.num_of_seller
+                max_price = self.max_buyer_price[idx]
+                min_price = self.min_buyer_price[idx]
+                max_volume = self.max_buyer_volume[idx]
+                min_volume = self.min_buyer_volume[idx]
+                # price: [-1, 1] -> [min_price, max_price]
+                price = _action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
+                # placeholder: -> 0
+                placeholder = _action[3*i+1] = 0
+                # volume: [-1, 1] -> [min_volume, max_volume]
+                volume = _action[3*i+2] = (_action[3*i+2] + 1) * (max_volume - min_volume) / 2 + min_volume
+        else:
+            new_action = type(self).init_action
+            # Copy from init state and only change seller's range
+            for i in range(self.num_of_seller):
+                max_price = self.max_seller_price[i]
+                min_price = self.min_seller_price[i]
+                # price_lower: [-1, 1] -> [min_price, max_price]
+                price_lower = new_action[3*i] = (_action[3*i] + 1) * (max_price - min_price) / 2 + min_price
+                # PRF -> seller_price_upper: [-1, 1] -> [price_lower, max_price]
+                price_upper = new_action[3*i+1] = (_action[3*i+1] + 1) * (max_price - price_lower) / 2 + price_lower
+            _action = new_action
 
         return _action

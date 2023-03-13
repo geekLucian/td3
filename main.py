@@ -151,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--log', action='store_true')
     parser.add_argument('-p', '--pretrained', action='store_true')
     parser.add_argument('-m', '--mode', type=str, action='store', required=True, choices=[
-        "normal", "reverse", "volume"
+        "normal", "reverse", "volume", "felxible"
     ])
     args = parser.parse_args()
     train(skip_log=(not args.log), 
