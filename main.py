@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 
@@ -23,10 +24,11 @@ def train(exp_name='range_pricing' + now,   # 指定本次实验的命名
           restore_filepath=None,            # 指定加载已存在模型的路径，比如 "results/xxx/models"
           max_episode_len=10,               # 指定每个episode最长多少步
           num_episodes=1500,                # 指定最多训练多少episode，然后终止训练
-          skip_log=False                    # Whether disable logging
+          skip_log=False,                   # Whether disable logging
+          mode="normal"                     # Specify which experiments to run
           ):
     # 创建环境
-    env = RangeEnv()
+    env = RangeEnv(mode)
 
     if skip_log:
         print("Log disabled")
@@ -145,7 +147,13 @@ def printlog(action_n, action, clear_price, match_result, end_reason):
     info("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
 
 if __name__ == '__main__':
-    # TODO: Make options avaiable from cmd line
-    skip_log = False
-    pretrained = True
-    train(skip_log=skip_log, restore_filepath="results/range_pricing_pretrained/models" if pretrained else None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l', '--log', action='store_true')
+    parser.add_argument('-p', '--pretrained', action='store_true')
+    parser.add_argument('-m', '--mode', type=str, action='store', required=True, choices=[
+        "normal", "reverse", "volume"
+    ])
+    args = parser.parse_args()
+    train(skip_log=(not args.log), 
+          restore_filepath="results/range_pricing_pretrained/models" if args.pretrained else None,
+          mode=args.mode)
