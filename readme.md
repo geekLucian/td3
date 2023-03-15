@@ -41,14 +41,13 @@ python -m unittest matd3.test.<test_name>
 
 ## TODO
 
-results naming: `model_ratio`
+results naming: `range_model_ratio`
 
-- model: normal, reverse, volume
-- ratio: blance, buyer_more (10%~20%), seller_more, buyer_much_more (>50%), seller_much_more
+- seller pricing range size: small (<20), normal, big
+- match model: normal, reverse, volume
+- volume ratio: blance, buyer_more (>50%), seller_more
 
-- [ ] implement `reverse`
-- [ ] understand & implement `volume`
-- [ ] understand how to adjust ratio
+- [ ] test match method
 - [ ] design expirments and batch testing
 
 not urgent:

@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import gym
+from copy import copy
 from enum import Enum
 from gym import spaces
 
@@ -223,7 +224,6 @@ class RangeEnv(gym.Env):
         :return: match_result = [[buyer_name, seller_name, match_volume, match_price], ...]
         :return end_reason 出清结束的原因 := 剩下未成交的买方价格低于卖方价格 || 卖方卖完 || 买方买完
         """
-        reverse = (mode == "reverse")
         # ======================= Data Unpack ==========================
         seller_price_lower, seller_price_upper, seller_volume, buyer_price, buyer_volume = [], [], [], [], []
         seller_name, buyer_name = list(range(NUM_OF_SELLER)), list(range(NUM_OF_BUYER))
@@ -236,13 +236,23 @@ class RangeEnv(gym.Env):
             buyer_volume.append(_action[(NUM_OF_SELLER + idx) * 3 + 2])
 
         # ======================= Price Rank ==========================
-        seller_data = zip(seller_price_lower, seller_price_upper, seller_volume, seller_name)
-        buyer_data = zip(buyer_price, buyer_volume, buyer_name)
-        seller_data = sorted(seller_data)  # sort sellers' metadata according to their prices' lower bound increasingly
-        buyer_data = sorted(buyer_data, reverse=True)  # sort buyers' metadata according to their prices decreasingly
-        seller_price_lower, seller_price_upper, seller_volume, seller_name = map(list, zip(*seller_data))
-        buyer_price, buyer_volume, buyer_name = map(list, zip(*buyer_data))
-
+        if (mode != "volume"):
+            # rank according to price
+            seller_data = zip(seller_price_lower, seller_price_upper, seller_volume, seller_name)
+            buyer_data = zip(buyer_price, buyer_volume, buyer_name)
+            seller_data = sorted(seller_data)  # sort sellers' metadata according to their prices' lower bound increasingly
+            buyer_data = sorted(buyer_data, reverse=True)  # sort buyers' metadata according to their prices decreasingly
+            seller_price_lower, seller_price_upper, seller_volume, seller_name = map(list, zip(*seller_data))
+            buyer_price, buyer_volume, buyer_name = map(list, zip(*buyer_data))
+        else:
+            # rank according to volume
+            seller_data = zip(seller_volume, seller_price_lower, seller_price_upper, seller_name)
+            buyer_data = zip(buyer_volume, buyer_price, buyer_name)
+            seller_data = sorted(seller_data, reverse=True)  # sort sellers' metadata according to their volumes decreasingly
+            buyer_data = sorted(buyer_data, reverse=True)    # sort buyers' metadata according to their volumes decreasingly
+            seller_volume, seller_price_lower, seller_price_upper, seller_name = map(list, zip(*seller_data))
+            buyer_volume, buyer_price, buyer_name = map(list, zip(*buyer_data))
+ 
         # ====================== Generate Ranges =======================
         seller_price = sorted(seller_price_lower + seller_price_upper)
         seller_clearance_price = []  # 卖方出清价格，为其 下限价格（区间下界） 和 最小的大于其下限价格（区间上界） 的平均
@@ -250,56 +260,152 @@ class RangeEnv(gym.Env):
         for i in range(NUM_OF_SELLER):
             lower_bound = seller_price_lower[i]
             upper_bound = next(_ for _ in seller_price if _ > lower_bound) if lower_bound < max_price else max_price
+            if mode == "reverse":
+                lower_bound = seller_price_upper[i] # use upper bound to calculate clearance price in reverse mode
             seller_clearance_price.append((lower_bound + upper_bound) / 2)
 
         # ==================== Matching Clearance ======================
-        matching_result = []
-        matching_seller_idx = 0 if not reverse else NUM_OF_SELLER - 1
-        matching_buyer_idx = 0 if not reverse else NUM_OF_BUYER - 1
-        matching_seller_price = seller_clearance_price[matching_seller_idx]
-        matching_buyer_price = buyer_price[matching_buyer_idx]
-        while (reverse and matching_buyer_price < matching_seller_price):
-            # TODO: delete which side?
-            assert(0)
+        if (mode == "normal" or mode == "reverse"):
+            if (mode == "reverse"):
+                # experimental run for reverse mode, to find the starting pair
+                # save volume data to recover in the offical run
+                seller_volume_bak = copy(seller_volume)
+                buyer_volume_bak = copy(buyer_volume)
+            matching_result = []
+            matching_seller_idx = 0
+            matching_buyer_idx = 0
+            matching_seller_price = seller_clearance_price[matching_seller_idx]
+            matching_buyer_price = buyer_price[matching_buyer_idx]
+            # 终止条件： 当前匹配的买方价格低于卖方价格 or 卖方卖完 or 买方买完
+            while (matching_buyer_price >= matching_seller_price
+                and matching_seller_idx < NUM_OF_SELLER
+                and matching_buyer_idx < NUM_OF_BUYER):
+                # name
+                matching_seller_name = seller_name[matching_seller_idx]
+                matching_buyer_name = buyer_name[matching_buyer_idx]
+                # price
+                matching_price = (matching_buyer_price + matching_seller_price) / 2
+                # volume
+                matching_seller_volume = seller_volume[matching_seller_idx]
+                matching_buyer_volume = buyer_volume[matching_buyer_idx]
+                matching_volume = min(matching_seller_volume, matching_buyer_volume)
+                seller_volume[matching_seller_idx] -= matching_volume
+                buyer_volume[matching_buyer_idx] -= matching_volume
+                matching_result.append([matching_buyer_name, matching_seller_name, matching_volume, matching_price])
+                # update index and price
+                if seller_volume[matching_seller_idx] == 0:
+                    matching_seller_idx += 1
+                    try:
+                        matching_seller_price = seller_clearance_price[matching_seller_idx]
+                    except IndexError:
+                        pass  # do nothing, the loop will end by itself
+                if buyer_volume[matching_buyer_idx] == 0:
+                    matching_buyer_idx += 1
+                    try:
+                        matching_buyer_price = buyer_price[matching_buyer_idx]
+                    except IndexError:
+                        pass  # do nothing, the loop will end by itself
+
+            end_reason = ""
+            if not matching_buyer_price >= matching_seller_price:
+                end_reason += "剩下未成交的买方价格低于卖方价格 "
+            if not matching_seller_idx < NUM_OF_SELLER:
+                end_reason += "卖方卖完 "
+            if not matching_buyer_idx < NUM_OF_BUYER:
+                end_reason += "买方买完 "
         
-        # 终止条件： 当前匹配的买方价格低于卖方价格 or 卖方卖完 or 买方买完
-        while (matching_buyer_price >= matching_seller_price
-               and 0 <= matching_seller_idx < NUM_OF_SELLER
-               and 0 <= matching_buyer_idx < NUM_OF_BUYER):
-            # name
-            matching_seller_name = seller_name[matching_seller_idx]
-            matching_buyer_name = buyer_name[matching_buyer_idx]
-            # price
-            matching_price = (matching_buyer_price + matching_seller_price) / 2
-            # volume
-            matching_seller_volume = seller_volume[matching_seller_idx]
-            matching_buyer_volume = buyer_volume[matching_buyer_idx]
-            matching_volume = min(matching_seller_volume, matching_buyer_volume)
-            seller_volume[matching_seller_idx] -= matching_volume
-            buyer_volume[matching_buyer_idx] -= matching_volume
-            matching_result.append([matching_buyer_name, matching_seller_name, matching_volume, matching_price])
-            # update index and price
-            if seller_volume[matching_seller_idx] == 0:
-                matching_seller_idx += 1 if not reverse else -1
-                try:
+        if (mode == "reverse"):
+            # recover volume data
+            seller_volume = seller_volume_bak
+            buyer_volume = buyer_volume_bak
+            # staring from the last pair, TODO: this way is not applicable when name != idx
+            matching_buyer_idx = matching_result[-1][0]
+            matching_seller_idx = matching_result[-1][1]
+            # initialization
+            matching_result = []
+            matching_seller_price = seller_clearance_price[matching_seller_idx]
+            matching_buyer_price = buyer_price[matching_buyer_idx]
+            
+            # 终止条件： 当前匹配的买方价格低于卖方价格 or 卖方卖完 or 买方买完
+            while (matching_seller_idx >= 0 and matching_buyer_idx >= 0): 
+                # name
+                matching_seller_name = seller_name[matching_seller_idx]
+                matching_buyer_name = buyer_name[matching_buyer_idx]
+                # price
+                if (matching_buyer_price >= matching_seller_price):
+                    matching_price = (matching_buyer_price + matching_seller_price) / 2
+                    # volume
+                    matching_seller_volume = seller_volume[matching_seller_idx]
+                    matching_buyer_volume = buyer_volume[matching_buyer_idx]
+                    matching_volume = min(matching_seller_volume, matching_buyer_volume)
+                    seller_volume[matching_seller_idx] -= matching_volume
+                    buyer_volume[matching_buyer_idx] -= matching_volume
+                    matching_result.append([matching_buyer_name, matching_seller_name, matching_volume, matching_price])
+                # update index and price                
+                if buyer_volume[matching_buyer_idx] == 0 or matching_buyer_price < matching_seller_price:
+                    matching_buyer_idx -= 1
+                    try:
+                        matching_buyer_price = buyer_price[matching_buyer_idx]
+                    except IndexError:
+                        pass  # do nothing, the loop will end by itself
+                if seller_volume[matching_seller_idx] == 0:
+                    matching_seller_idx -= 1
+                    try:
+                        matching_seller_price = seller_clearance_price[matching_seller_idx]
+                    except IndexError:
+                        pass  # do nothing, the loop will end by itself
+            
+            end_reason = ""
+            if not matching_seller_idx >= 0:
+                end_reason += "卖方卖完 "
+            if not matching_buyer_idx >= 0:
+                end_reason += "买方买完 "
+
+        if (mode == "volume"):
+            matching_result = []
+            matching_seller_idx = 0
+            matching_buyer_idx = 0
+            while (matching_seller_idx < NUM_OF_SELLER and matching_buyer_idx < NUM_OF_BUYER):
+                matching_seller_volume = seller_volume[matching_seller_idx]
+                matching_buyer_volume = buyer_volume[matching_buyer_idx]
+                focus_on_seller = (matching_seller_volume >= matching_buyer_volume)  # larger volume first
+                if (focus_on_seller):
+                    matching_seller_name = seller_name[matching_seller_idx]
                     matching_seller_price = seller_clearance_price[matching_seller_idx]
-                except IndexError:
-                    pass  # do nothing, the loop will end by itself
-            if buyer_volume[matching_buyer_idx] == 0:
-                matching_buyer_idx += 1 if not reverse else -1
-                try:
+                    for cur_buyer_idx in range(matching_buyer_idx, NUM_OF_BUYER):
+                        cur_buyer_name = buyer_name[cur_buyer_idx]
+                        cur_buyer_price = buyer_price[cur_buyer_idx]
+                        if (cur_buyer_price >= matching_seller_price and buyer_volume[cur_buyer_idx] > 0):
+                            matching_price = (cur_buyer_price + matching_seller_price) / 2
+                            matching_seller_volume = seller_volume[matching_seller_idx]
+                            matching_buyer_volume = buyer_volume[cur_buyer_idx]
+                            matching_volume = min(matching_seller_volume, matching_buyer_volume)
+                            seller_volume[matching_seller_idx] -= matching_volume 
+                            buyer_volume[cur_buyer_idx] -= matching_volume 
+                            matching_result.append([cur_buyer_name, matching_seller_name, matching_volume, matching_price])
+                        if (seller_volume[matching_seller_idx] == 0):
+                            break   # break for_buyer loop
+                    matching_seller_idx += 1
+                else:
+                    matching_buyer_name = buyer_name[matching_buyer_idx]
                     matching_buyer_price = buyer_price[matching_buyer_idx]
-                except IndexError:
-                    pass  # do nothing, the loop will end by itself
+                    for cur_seller_idx in range(matching_seller_idx, NUM_OF_SELLER):
+                        cur_seller_name = seller_name[cur_seller_idx]
+                        cur_seller_price = seller_clearance_price[cur_seller_idx]
+                        if (matching_buyer_price >= cur_seller_price and seller_volume[cur_seller_idx] > 0):
+                            matching_price = (cur_seller_price + matching_buyer_price) / 2
+                            matching_buyer_volume = buyer_volume[matching_buyer_idx]
+                            matching_seller_volume = seller_volume[cur_seller_idx]
+                            matching_volume = min(matching_buyer_volume, matching_seller_volume)
+                            buyer_volume[matching_buyer_idx] -= matching_volume
+                            seller_volume[cur_seller_idx] -= matching_volume
+                            matching_result.append([matching_buyer_name, cur_seller_name, matching_volume, matching_price])
+                            if (buyer_volume[matching_buyer_idx] == 0):
+                                break   # break for_seller loop
+                    matching_buyer_idx += 1
 
-        end_reason = ""
-        if not matching_buyer_price >= matching_seller_price:
-            end_reason += "剩下未成交的买方价格低于卖方价格 "
-        if not (0 <= matching_seller_idx < NUM_OF_SELLER):
-            end_reason += "卖方卖完 "
-        if not (0 <= matching_buyer_idx < NUM_OF_BUYER):
-            end_reason += "买方买完 "
-
+            end_reason = "剩下无法成交"
+           
         return matching_result, end_reason
 
     def statistics(self, match_result):
