@@ -20,8 +20,12 @@ class RangeEnv(gym.Env):
     goal = Goal.VOLUME_FIRST
     init_action = []
     
-    def __init__(self, mode, svs, bvs):
+    def __init__(self, mode, svs, bvs, rs):
         self.mode = mode                                        # which experiment to run
+        self.seller_volume_scale = svs
+        self.buyer_volume_scale = bvs
+        self.range_scale = rs
+
         self.num_of_seller = NUM_OF_SELLER                      # 卖方数量
         self.max_seller_volume = np.zeros(self.num_of_seller)   # 最大申报量
         self.min_seller_volume = np.zeros(self.num_of_seller)   # 最小申报量
@@ -43,9 +47,7 @@ class RangeEnv(gym.Env):
         self.buyer_name = ["buyer_%d" % i for i in range(self.num_of_buyer)]
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
-        self.seller_volume_scale = svs
-        self.buyer_volume_scale = bvs
-
+        
         self.action_space = self.observation_space = []
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
         #                 Box(buyer0_price, placeholder, buyer0_volume), ...]
@@ -81,6 +83,10 @@ class RangeEnv(gym.Env):
         seller_data = np.loadtxt(path)
         self.max_seller_volume = seller_data[:, 0]  # 读取各个卖方的最大申报电量
         self.min_seller_volume = seller_data[:, 1]  # 读取各个卖方的最小申报电量
+        avg_seller_volume = (self.max_seller_volume + self.min_seller_volume) / 2
+        if (self.range_scale != 1.0):
+            self.max_seller_volume = avg_seller_volume + self.range_scale * (self.max_seller_volume - avg_seller_volume)
+            self.min_seller_volume = avg_seller_volume + self.range_scale * (self.min_seller_volume - avg_seller_volume)
         self.costfunction_for_sellers = seller_data[:, 2:seller_data.shape[1]]  # 列切片，去掉第一列和第二列。
 
         seller_strategy = np.loadtxt(path_strategy)

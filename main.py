@@ -27,10 +27,11 @@ def train(exp_name='range_pricing' + now,   # 指定本次实验的命名
           skip_log=False,                   # Whether disable logging
           mode="normal",                    # Specify which experiments to run
           svs=1.0,                          # seller volume scale
-          bvs=1.0                           # buyer volume scale
+          bvs=1.0,                          # buyer volume scale
+          rs=1.0                            # range size scale
           ):
     # 创建环境
-    env = RangeEnv(mode, svs, bvs)
+    env = RangeEnv(mode, svs, bvs, rs)
 
     if skip_log:
         print("Log disabled")
@@ -139,13 +140,17 @@ def printlog(action_n, action, clear_price, match_result, end_reason):
         "   [[seller0_price_lower, seller0_price_range_factor, seller0_volume], ...,\n"
             "   [buyer0_price, placeholder, buyer0_volume], ...]\n\t" + 
             '\n\t'.join(map(str, action_n)))
+    print(action_n)
     info("实际报价报量:\n"
         "\t[seller0_price_lower, seller0_price_upper, seller0_volume, ...,\n"
         "\t buyer0_price, placeholder, buyer0_volume, ...]\n" + 
             action_msg)
+    print(action)
     info("平均价格:\n\t[seller0_avg_price, seller1_avg_price, ..., buyer0_avg_price]\n" + str(clear_price))
+    print(clear_price)
     info("交易记录:\n\t[[buyer_name, seller_name, match_volume, match_price]]\n\t" +
             '\n\t'.join(map(str, match_result)))
+    print(match_result)
     info("共{}条，出清中止原因：{}".format(len(match_result), end_reason))
 
 if __name__ == '__main__':
@@ -157,11 +162,11 @@ if __name__ == '__main__':
     ])
     parser.add_argument('-s', '--seller_volume_scale', type=float, action='store', default=1.0)
     parser.add_argument('-b', '--buyer_volume_scale', type=float, action='store', default=1.0)
+    parser.add_argument('-r', '--range_scale', type=float, action='store', default=1.0)
     args = parser.parse_args()
-    print(args.seller_volume_scale)
-    print(args.buyer_volume_scale)
     train(skip_log=(not args.log), 
           restore_filepath="results/range_pricing_pretrained/models" if args.pretrained else None,
           mode=args.mode,
           svs=args.seller_volume_scale,
-          bvs=args.buyer_volume_scale)
+          bvs=args.buyer_volume_scale,
+          rs=args.range_scale)
