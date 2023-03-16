@@ -319,10 +319,13 @@ class RangeEnv(gym.Env):
             seller_volume = seller_volume_bak
             buyer_volume = buyer_volume_bak
             # staring from the last pair
-            matching_buyer_name = matching_result[-1][0]
-            matching_seller_name = matching_result[-1][1]
-            matching_buyer_idx = buyer_name.index(matching_buyer_name)
-            matching_seller_idx = seller_name.index(matching_seller_name)
+            if matching_result != []:
+                matching_buyer_name = matching_result[-1][0]
+                matching_seller_name = matching_result[-1][1]
+                matching_buyer_idx = buyer_name.index(matching_buyer_name)
+                matching_seller_idx = seller_name.index(matching_seller_name)
+            else:
+                return [], "无法正常出清"
             # initialization
             matching_result = []
             matching_seller_price = seller_clearance_price[matching_seller_idx]
