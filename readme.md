@@ -41,10 +41,10 @@ python -m unittest matd3.test.<test_name>
 
 ## TODO
 
-results naming: `range_model_ratio`
+results naming: `model_range_ratio`
 
-- seller pricing range size: small (<20), normal, big
 - match model: normal, reverse, volume
+- seller pricing range size: small (<20), medium, big
 - volume ratio: blance, buyer_more (>50%), seller_more
 
 - [ ] test match method

@@ -164,7 +164,22 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--buyer_volume_scale', type=float, action='store', default=1.0)
     parser.add_argument('-r', '--range_scale', type=float, action='store', default=1.0)
     args = parser.parse_args()
-    train(skip_log=(not args.log), 
+    exp_name = args.mode
+    if args.range_scale <= 0.5:
+        exp_name += "_small"
+    elif args.range_scale <= 1:
+        exp_name += "_medium"
+    else:
+        exp_name += "_big"
+    if args.seller_volume_scale == args.buyer_volume_scale:
+        exp_name += "_blance"
+    elif args.seller_volume_scale > args.buyer_volume_scale:
+        exp_name += "_seller_more"
+    else:
+        exp_name += "_buyer_more"
+    exp_name += now
+    train(exp_name=args.mode + now,
+          skip_log=(not args.log), 
           restore_filepath="results/range_pricing_pretrained/models" if args.pretrained else None,
           mode=args.mode,
           svs=args.seller_volume_scale,
