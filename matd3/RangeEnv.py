@@ -19,7 +19,27 @@ class Goal(Enum):
 class RangeEnv(gym.Env):
     # Use VOLUME_FIRST here to maximize trading volume.
     goal = Goal.VOLUME_FIRST
-    init_action = []
+    use_preset_action = True
+    init_action = [329.6369514465332, 351.6155160191929, 49200.560027480125,
+                   338.9265112876892, 342.5413241489154, 50594.022253513336,
+                   329.0849575996399, 338.6838995129262, 44720.75809657574,
+                   350.52417850494385, 353.89575720030086, 69051.62560641766,
+                   345.4413856267929, 390.5433321169308, 44095.910274505615,
+                   346.7970378398895, 359.4954600956114, 70344.21908557415,
+                   339.1159427165985, 350.78961743657896, 37338.00921535492,
+                   323.78358244895935, 356.87795106683905, 48699.23500204086,
+                   341.4933223724365, 345.14823941266695, 63140.12389087677,
+                   331.6401882171631, 338.4804022680835, 31500.63673400879,
+                   354.26789021492004, 0, 82076.52778840065,
+                   349.2439988851547, 0, 63219.365176320076,
+                   360.1553860902786, 0, 63989.33934688568,
+                   354.44252920150757, 0, 52013.56042158604,
+                   358.8302297592163, 0, 68513.07495617867,
+                   361.0858074426651, 0, 38722.26921606064,
+                   353.2797602415085, 0, 49434.99908769131,
+                   353.6352334022522, 0, 44436.31066274643,
+                   359.6153789758682, 0, 33738.86096525192,
+                   347.17684185504913, 0, 5975.596432924271]
     
     def __init__(self, mode, svs, bvs, rs):
         self.mode = mode                                        # which experiment to run
@@ -48,7 +68,12 @@ class RangeEnv(gym.Env):
         self.buyer_name = ["buyer_%d" % i for i in range(self.num_of_buyer)]
         self.seller_name = ["seller_%d" % i for i in range(self.num_of_seller)]
 
-        
+        if self.use_preset_action:
+            for i in range(10):
+                self.init_action[i * 3 + 2] *= svs
+            for i in range(10, 20):
+                self.init_action[i * 3 + 2] *= bvs
+
         self.action_space = self.observation_space = []
         # action_space = [Box(seller0_price_lower, seller0_price_range_factor, seller0_volume), ...,
         #                 Box(buyer0_price, placeholder, buyer0_volume), ...]
@@ -84,21 +109,25 @@ class RangeEnv(gym.Env):
         seller_data = np.loadtxt(path)
         self.max_seller_volume = seller_data[:, 0]  # 读取各个卖方的最大申报电量
         self.min_seller_volume = seller_data[:, 1]  # 读取各个卖方的最小申报电量
-        avg_seller_volume = (self.max_seller_volume + self.min_seller_volume) / 2
-        if (self.range_scale != 1.0):
-            self.max_seller_volume = avg_seller_volume + self.range_scale * (self.max_seller_volume - avg_seller_volume)
-            self.min_seller_volume = avg_seller_volume + self.range_scale * (self.min_seller_volume - avg_seller_volume)
+        self.max_seller_volume *= self.seller_volume_scale
+        self.min_seller_volume *= self.seller_volume_scale
         self.costfunction_for_sellers = seller_data[:, 2:seller_data.shape[1]]  # 列切片，去掉第一列和第二列。
 
         seller_strategy = np.loadtxt(path_strategy)
         self.max_seller_price = seller_strategy[:, 0]
         self.min_seller_price = seller_strategy[:, 1]
+        # set (max - min == range_scale) while keeping with avg the same
+        avg_seller_price = (self.max_seller_price + self.min_seller_price) / 2
+        self.max_seller_price = avg_seller_price + self.range_scale / 2
+        self.min_seller_price = avg_seller_price - self.range_scale / 2
 
     # 输入购电方的成本模型信息，strategy文件存储：最大申报价格、最小申报价格、低价区间采购量范围、中价区间采购量范围、高价区间采购量范围
     def set_data_for_buyer(self, path="data/buyer_data.txt", path_strategy="data/buyer_strategy_data.txt"):
         buyer_data = np.loadtxt(path)
         self.max_buyer_volume = buyer_data[:, 0]  # 读取各个卖方的最大申报电量
         self.min_buyer_volume = buyer_data[:, 1]  # 读取各个卖方的最小申报电量
+        self.max_buyer_volume *= self.buyer_volume_scale
+        self.min_buyer_volume *= self.buyer_volume_scale
 
         buyer_strategy = np.loadtxt(path_strategy)
         self.max_buyer_price = buyer_strategy[:, 0]
@@ -113,32 +142,35 @@ class RangeEnv(gym.Env):
         return [np.zeros(shape=self.observation_space[i].shape) for i in range(self.n)]
         """
         # ======================== 报价报量 ==========================
-        # 随机生成双方电量和报价，在[min, max]之间的均匀分布
-        # 卖方区间报价，下界seller_price_lower, 上界seller_price_upper
-        #   seller_price_lower in [min[i], max[i]]
-        #   seller_price_upper in [lower[i], max[i]]
-        seller_price_lower = [random.uniform(self.min_seller_price[i], self.max_seller_price[i]) for i in
-                              range(self.num_of_seller)]
-        seller_price_upper = [random.uniform(seller_price_lower[i], self.max_seller_price[i]) for i in
-                              range(self.num_of_seller)]
-        buyer_price = [random.uniform(self.min_buyer_price[i], self.max_buyer_price[i]) for i in
-                       range(self.num_of_buyer)]
-        seller_volume = [random.uniform(self.min_seller_volume[i], self.max_seller_volume[i]) * self.seller_volume_scale
-                         for i in range(self.num_of_seller)]
-        buyer_volume = [random.uniform(self.min_buyer_volume[i], self.max_buyer_volume[i]) * self.buyer_volume_scale
-                         for i in range(self.num_of_buyer)]
+        if not self.use_preset_action:
+            # 随机生成双方电量和报价，在[min, max]之间的均匀分布
+            # 卖方区间报价，下界seller_price_lower, 上界seller_price_upper
+            #   seller_price_lower in [min[i], max[i]]
+            #   seller_price_upper in [lower[i], max[i]]
+            seller_price_lower = [random.uniform(self.min_seller_price[i], self.max_seller_price[i]) for i in
+                                range(self.num_of_seller)]
+            seller_price_upper = [random.uniform(seller_price_lower[i], self.max_seller_price[i]) for i in
+                                range(self.num_of_seller)]
+            buyer_price = [random.uniform(self.min_buyer_price[i], self.max_buyer_price[i]) for i in
+                        range(self.num_of_buyer)]
+            seller_volume = [random.uniform(self.min_seller_volume[i], self.max_seller_volume[i]) * self.seller_volume_scale
+                            for i in range(self.num_of_seller)]
+            buyer_volume = [random.uniform(self.min_buyer_volume[i], self.max_buyer_volume[i]) * self.buyer_volume_scale
+                            for i in range(self.num_of_buyer)]
 
-        # Data Packing
-        # _action data layout:
-        #   [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, 0, buyer0_volume, ...]
-        _seller_data = [seller_price_lower, seller_price_upper, seller_volume]
-        _buyer_data = [buyer_price, [0] * self.num_of_buyer, buyer_volume]
-        _seller_action = [val for tup in zip(*_seller_data) for val in tup]
-        _buyer_action = [val for tup in zip(*_buyer_data) for val in tup]
-        _action = _seller_action + _buyer_action
-        if not type(self).init_action:
-            type(self).init_action = _action
-
+            # Data Packing
+            # _action data layout:
+            #   [seller0_price_lower, seller0_price_upper, seller0_volume, ..., buyer0_price, 0, buyer0_volume, ...]
+            _seller_data = [seller_price_lower, seller_price_upper, seller_volume]
+            _buyer_data = [buyer_price, [0] * self.num_of_buyer, buyer_volume]
+            _seller_action = [val for tup in zip(*_seller_data) for val in tup]
+            _buyer_action = [val for tup in zip(*_buyer_data) for val in tup]
+            _action = _seller_action + _buyer_action
+            if not type(self).init_action:
+                type(self).init_action = _action
+        else:
+            _action = self.init_action
+        
         # ========================= 出清 ===========================
         # match_result := [[buyer_name, seller_name, match_volume, match_price], ...]
         match_result, end_reason = self.get_match_result(_action, self.mode)

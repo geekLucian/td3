@@ -165,9 +165,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--range_scale', type=float, action='store', default=1.0)
     args = parser.parse_args()
     exp_name = args.mode
-    if args.range_scale <= 0.5:
+    if args.range_scale <= 20:
         exp_name += "_small"
-    elif args.range_scale <= 1:
+    elif args.range_scale <= 50:
         exp_name += "_medium"
     else:
         exp_name += "_big"
@@ -178,7 +178,7 @@ if __name__ == '__main__':
     else:
         exp_name += "_buyer_more"
     exp_name += now
-    train(exp_name=args.mode + now,
+    train(exp_name=exp_name,
           skip_log=(not args.log), 
           restore_filepath="results/range_pricing_pretrained/models" if args.pretrained else None,
           mode=args.mode,
